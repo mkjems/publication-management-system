@@ -169,6 +169,8 @@ export const da = {
     today: 'I dag',
     release: 'Udgivelse',
     pause: 'Pause',
+    desiredRelease: 'Ønsket udgivelse',
+    bindingRelease: 'Bindende udgivelse',
     deadline: 'deadline',
     baseline: 'Oprindelig plan',
     linkHint: 'Træk til en anden aktivitet for at tilføje en afhængighed',
@@ -185,6 +187,8 @@ export const da = {
       forecast: 'Prognose',
       slack: 'Buffer',
       preliminary: 'Foreløbig plan',
+      pause: 'Pause',
+      sandbox: 'Rigtig plan (scenarie)',
     },
     dependencyAdded: (from: string, to: string) => `"${to}" afhænger nu af "${from}"`,
   },
@@ -205,6 +209,8 @@ export const da = {
     workdays: 'arbejdsdage',
     description: (name: string) => `Hvad sker der, hvis "${name}" flyttes?`,
     newDeadline: 'Ny deadline',
+    orWorkdays: 'eller',
+    workdaysLater: 'arbejdsdage senere',
     strategy: 'Sådan håndteres forsinkelsen',
     release: 'Udgivelse',
     releaseUnchanged: 'Påvirker ikke udgivelsen',
@@ -247,7 +253,7 @@ export const da = {
     note: 'Bemærkning',
     history: 'Historik',
     noHistory: 'Ingen ændringer endnu.',
-    move: 'Flyt deadline…',
+    move: 'Udskyd…',
     reasons: 'Hvorfor',
   },
 
@@ -256,6 +262,153 @@ export const da = {
     by: { simulation: 'simulering', scenario: 'scenarie', user: 'dig' },
     moved: (n: number) => `${n} ${n === 1 ? 'aktivitet' : 'aktiviteter'} flyttet`,
     showMore: (n: number) => `Vis flere (${n})`,
+    log: 'Ændringslog',
+    noMatches: 'Ingen ændringer matcher filteret.',
+    filter: {
+      all: 'Alle ændringer',
+      planning: 'Planændringer',
+      status: 'Statusændringer',
+      other: 'Øvrige',
+    },
+    allCategories: 'Alle årsager',
+    allAuthors: 'Alle',
+    authors: { user: 'Kun mine', simulation: 'Kun simulering' },
+    baselines: 'Baselines',
+    baselineName: (n: number) => (n === 0 ? 'Oprindelig plan' : `Baseline ${n}`),
+    baselineRelease: 'Udgivelse',
+    noBaselines:
+      'Planen er foreløbig. Den oprindelige plan gemmes, når planen bliver bindende (milepælen "Finansiering tilstrækkelig").',
+  },
+
+  trend: {
+    title: 'Milepælenes udvikling',
+    description:
+      'Prognosen for hver milepæl, sådan som den så ud uge for uge. En vandret linje er en milepæl, der holder; en linje, der stiger, er en milepæl, der skrider. Milepælen er nået, når linjen rammer diagonalen.',
+    xAxis: 'Dato for prognosen',
+    yAxis: 'Forventet dato',
+    target: 'Udgivelsesdato (mål)',
+    diagonal: 'Dags dato',
+    showAll: 'Vis alle milepæle',
+    showKey: 'Vis vigtigste',
+    empty:
+      'Endnu ingen historik at vise. Grafen fyldes op, efterhånden som planen ændres og tiden går.',
+    incomplete: 'Ændringsloggen kunne ikke afspilles helt tilbage; grafen viser den seneste del.',
+    slipped: (days: number) => `skredet ${days} arbejdsdage`,
+    held: 'holder',
+    done: 'nået',
+  },
+
+  planActions: {
+    menu: 'Planlægning',
+    release: 'Flyt udgivelsesdato…',
+    pause: 'Sæt på pause…',
+    resume: 'Genoptag…',
+    makeBinding: 'Gør planen bindende…',
+    rebaseline: 'Gem ny baseline…',
+    scenario: 'Afprøv i et scenarie',
+  },
+
+  comparison: {
+    release: 'Udgivelse',
+    target: 'Udgivelsesdato',
+    forecast: 'Prognose',
+    unchanged: 'uændret',
+    moved: (n: number) => `${n} ${n === 1 ? 'aktivitet flyttes' : 'aktiviteter flyttes'}`,
+    milestones: 'Milepæle',
+    noMilestoneChanges: 'Ingen milepæle flytter sig.',
+    nothing: 'Ingen datoer ændres.',
+    statusChanged: (n: number) => `${n} ${n === 1 ? 'statusændring' : 'statusændringer'}`,
+    andMore: (n: number) => `og ${n} flere`,
+    pinnedConflicts: 'Konflikt med fastlåste datoer',
+    acceptConflicts: 'Fortsæt alligevel (fastlåste datoer bliver stående)',
+  },
+
+  releaseDialog: {
+    title: 'Flyt udgivelsesdatoen',
+    description:
+      'Al resterende arbejde flyttes med, så afstanden til udgivelsen bevares. Overskredne aktiviteter bliver stående, så forsinkelsen stadig kan ses.',
+    current: 'Nuværende',
+    newDate: 'Ny udgivelsesdato',
+    workdays: 'arbejdsdage',
+    rebaseline: (n: number) =>
+      `Planen er bindende: den nye plan gemmes som baseline ${n}. Den oprindelige plan bevares.`,
+    apply: 'Flyt udgivelsen',
+  },
+
+  pauseDialog: {
+    title: 'Sæt udgivelsen på pause',
+    description:
+      'Fx HOLD mens et fondssvar afventes. Intet flyttes nu; prognosen viser, hvad pausen koster, efterhånden som tiden går. Når projektet genoptages, vælger du, hvordan resten af planen flyttes.',
+    from: 'Pause fra',
+    reasonPlaceholder: 'Fx Afventer svar fra Augustinus Fonden',
+    reasonRequired: 'Skriv en begrundelse.',
+    apply: 'Sæt på pause',
+  },
+
+  resumeDialog: {
+    title: 'Genoptag udgivelsen',
+    description: (from: string, days: number) =>
+      `På pause siden ${from} (${days} ${days === 1 ? 'arbejdsdag' : 'arbejdsdage'}).`,
+    on: 'Genoptages',
+    mode: 'Resten af planen',
+    shift: {
+      label: 'Flyt med pausens længde',
+      hint: 'Alt uafsluttet arbejde rykker lige så mange arbejdsdage, som pausen varede. Udgivelsen rykker med.',
+    },
+    newRelease: {
+      label: 'Planlæg mod en ny udgivelsesdato',
+      hint: 'Resten af planen lægges baglæns fra den dato, du vælger.',
+    },
+    releaseDate: 'Ny udgivelsesdato',
+    notBefore: 'Intet, der ikke er startet, kan starte før genoptagelsen.',
+    apply: 'Genoptag',
+  },
+
+  bindingDialog: {
+    makeBinding: {
+      title: 'Gør planen bindende',
+      description:
+        'Udgivelsesdatoen bliver bindende, og den nuværende plan gemmes som den oprindelige plan (baseline 0). Normalt sker det, når milepælen "Finansiering tilstrækkelig" er nået.',
+      apply: 'Gør bindende',
+    },
+    rebaseline: {
+      title: 'Gem ny baseline',
+      description: (n: number) =>
+        `Den nuværende plan gemmes som baseline ${n}. Den oprindelige plan bevares, og afvigelser måles fortsat mod den.`,
+      apply: 'Gem baseline',
+    },
+    release: 'Udgivelsesdato',
+    reasonPlaceholder: 'Fx Fondsmidler bevilget',
+  },
+
+  sandbox: {
+    title: 'Scenarie',
+    body: 'Du afprøver ændringer i en kopi af planen. Den rigtige plan er uændret, indtil du anvender ændringerne. Scenariet gemmes ikke, hvis du lukker siden.',
+    compare: 'Sammenlign med den rigtige plan',
+    hideCompare: 'Skjul sammenligning',
+    apply: 'Anvend ændringerne',
+    discard: 'Kassér scenariet',
+    noChanges: 'Ingen ændringer endnu.',
+    changes: (n: number) => `${n} ${n === 1 ? 'ændring' : 'ændringer'} i scenariet`,
+    discardConfirmTitle: 'Kassér scenariet?',
+    discardConfirmBody: 'Ændringerne i scenariet går tabt. Den rigtige plan er uændret.',
+    applied: 'Ændringerne er anvendt på den rigtige plan.',
+    conflict:
+      'Den rigtige plan er ændret, siden scenariet blev åbnet. Kassér scenariet og prøv igen.',
+    timeStopped: 'Tiden står stille, mens et scenarie er åbent.',
+    ghost: 'Rigtig plan',
+  },
+
+  scenarioBook: {
+    open: 'Fra scenarie…',
+    title: 'Ny eksempelbog fra et scenarie',
+    description:
+      'Bogen følger et navngivet forløb fra scenariebiblioteket. Den spilles frem til den simulerede dato og fortsætter historien, når du går frem i tiden.',
+    scenario: 'Scenarie',
+    workingTitle: 'Arbejdstitel',
+    releaseDate: 'Ønsket udgivelsesdato',
+    releaseHint: 'Ligger udgivelsen tæt på, er bogen allerede godt i gang.',
+    create: 'Opret bog',
   },
 } as const
 

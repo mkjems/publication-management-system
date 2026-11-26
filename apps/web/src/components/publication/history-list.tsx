@@ -1,4 +1,4 @@
-import type { PublicationRecord } from '@pms/domain'
+import type { ChangeEvent, Publication } from '@pms/domain'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { EVENT_LABELS, REASON_CATEGORY_LABELS, da } from '@/i18n/da'
@@ -7,12 +7,19 @@ import { describeEvent, eventAuthor } from '@/lib/publication'
 
 const PAGE = 100
 
-/** The publication's change log, newest first. */
-export function HistoryList({ record }: { record: PublicationRecord }) {
+/** Change events, in the order given (the history view passes newest first). */
+export function HistoryList({
+  events,
+  publication,
+  empty = da.history.empty,
+}: {
+  events: ChangeEvent[]
+  publication: Publication
+  empty?: string
+}) {
   const [limit, setLimit] = useState(PAGE)
-  const events = [...record.history.log].reverse()
   if (!events.length) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">{da.history.empty}</p>
+    return <p className="py-10 text-center text-sm text-muted-foreground">{empty}</p>
   }
   return (
     <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
@@ -25,7 +32,7 @@ export function HistoryList({ record }: { record: PublicationRecord }) {
               </td>
               <td className="w-44 px-3 py-2 font-medium">{EVENT_LABELS[e.type]}</td>
               <td className="px-3 py-2">
-                {describeEvent(e, record.publication)}
+                {describeEvent(e, publication)}
                 {e.reason && <div className="text-xs text-muted-foreground">“{e.reason}”</div>}
               </td>
               <td className="w-40 px-3 py-2 text-xs text-muted-foreground">

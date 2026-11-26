@@ -47,6 +47,15 @@
   --bar-deadline: oklch(0.45 0.05 262);
   --bar-optional: oklch(0.75 0.03 262);
   --phase-band: oklch(0.88 0.03 262);
+
+  /* Chart series (categorical, fixed order). Validated for CVD separation on the card surface
+   * in both modes; light slots 2–5 are below 3:1, so charts pair them with a value table. */
+  --series-1: #257de0;
+  --series-2: #f47230;
+  --series-3: #00b894;
+  --series-4: #f2a600;
+  --series-5: #ee7fac;
+  --series-6: #008a17;
 }
 
 .dark {
@@ -70,6 +79,12 @@
   --sidebar: oklch(0.2 0.016 262);
   --sidebar-accent: oklch(0.27 0.02 262);
   --phase-band: oklch(0.35 0.04 262);
+  --series-1: #338ced;
+  --series-2: #e76624;
+  --series-3: #00a888;
+  --series-4: #d28e05;
+  --series-5: #e24d8b;
+  --series-6: #0aac23;
 }
 
 @theme inline {

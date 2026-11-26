@@ -31,6 +31,7 @@ import { useCommand } from '@/hooks/use-command'
 import { REASON_CATEGORY_LABELS, STRATEGY_LABELS, da } from '@/i18n/da'
 import { formatDate, formatDateCompact } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { DateWithWorkdays } from './plan-dialogs'
 
 const STRATEGIES: Strategy[] = ['absorb', 'push', 'compress', 'move_release']
 const SHOWN_MOVES = 6
@@ -122,20 +123,13 @@ export function ImpactDialog({
           {mode === 'deadline' ? (
             <div className="grid gap-2">
               <Label htmlFor={ids.deadline}>{da.impact.newDeadline}</Label>
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {formatDate(activity.deadline)}
-                </span>
-                <ArrowRight className="size-4 text-muted-foreground" />
-                <Input
-                  id={ids.deadline}
-                  type="date"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className="w-44"
-                  autoFocus
-                />
-              </div>
+              <DateWithWorkdays
+                id={ids.deadline}
+                from={activity.deadline}
+                value={deadline}
+                onChange={setDeadline}
+                calendar={pub.calendar}
+              />
             </div>
           ) : (
             <div className="grid gap-2">

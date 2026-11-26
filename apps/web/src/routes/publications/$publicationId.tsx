@@ -13,7 +13,7 @@ import { Gantt } from '@/components/gantt/gantt'
 import { GanttLegend } from '@/components/gantt/legend'
 import { ZOOMS, type Zoom } from '@/components/gantt/scale'
 import { ActivityPanel } from '@/components/publication/activity-panel'
-import { HistoryList } from '@/components/publication/history-list'
+import { HistoryView } from '@/components/publication/history-view'
 import { ImpactDialog } from '@/components/publication/impact-dialog'
 import { PlanTable } from '@/components/publication/plan-table'
 import { PublicationHeader } from '@/components/publication/publication-header'
@@ -21,11 +21,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { useCommand } from '@/hooks/use-command'
-import { useHealth, usePublicationRecord } from '@/hooks/use-publication'
+import { useHealth, usePublicationRecord, useSandbox } from '@/hooks/use-publication'
 import { da } from '@/i18n/da'
 import { groupActivities } from '@/lib/publication'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/store'
+import { selectRecord } from '@/store/workspace-store'
 import { useFlash } from '@/store/flash'
 
 const TABS = ['table', 'gantt', 'history'] as const
@@ -90,6 +91,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
     null,
   )
   const run = useCommand(pub.id)
+  const sandbox = useSandbox(pub.id)
   const tab = search.tab ?? 'table'
   const filter = search.filter ?? 'all'
   const filtering = Boolean(search.q || search.role || filter !== 'all')
@@ -104,7 +106,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
       if (t.closest('input, textarea, select, [contenteditable]')) return
       e.preventDefault()
       const s = useWorkspace.getState()
-      const h = s.records[pub.id]?.history
+      const h = selectRecord(s, pub.id)?.history
       try {
         if (e.shiftKey && h?.redoable.length) s.redo(pub.id)
         else if (!e.shiftKey && h?.undoable.length) s.undo(pub.id)
@@ -306,35 +308,44 @@ function PublicationView({ record }: { record: PublicationRecord }) {
 
       {tab === 'gantt' && groups.length > 0 && (
         <>
-          <Gantt
-            publication={pub}
-            health={health}
-            asOf={asOf}
-            groups={groups}
-            isOpen={isOpen}
-            onToggle={toggle}
-            zoom={search.zoom ?? 'month'}
-            showCritical={Boolean(search.critical)}
-            showAllDependencies={Boolean(search.deps)}
-            selectedId={search.activity ?? null}
-            onOpenActivity={openActivity}
-            onRequestChange={(change) => setPending({ activityId: change.activityId, change })}
-            onAddDependency={(predecessorId, successorId) =>
-              run((p, c) =>
-                addDependency(
-                  p,
-                  successorId,
-                  { activityId: predecessorId, type: 'FS', lagWorkdays: 0 },
-                  c,
-                ),
-              )
-            }
+          {/* Full bleed: the chart spans the whole content column (the root layout's
+              @container), not just the max-width page; margins mirror the page gutter. */}
+          <div className="mr-[calc(50%-50cqw+1rem)] ml-[calc(50%-50cqw+1rem)] md:mr-[calc(50%-50cqw+1.5rem)] md:ml-[calc(50%-50cqw+1.5rem)]">
+            <Gantt
+              publication={pub}
+              health={health}
+              asOf={asOf}
+              groups={groups}
+              isOpen={isOpen}
+              onToggle={toggle}
+              zoom={search.zoom ?? 'month'}
+              showCritical={Boolean(search.critical)}
+              showAllDependencies={Boolean(search.deps)}
+              selectedId={search.activity ?? null}
+              onOpenActivity={openActivity}
+              onRequestChange={(change) => setPending({ activityId: change.activityId, change })}
+              onAddDependency={(predecessorId, successorId) =>
+                run((p, c) =>
+                  addDependency(
+                    p,
+                    successorId,
+                    { activityId: predecessorId, type: 'FS', lagWorkdays: 0 },
+                    c,
+                  ),
+                )
+              }
+              compareTo={sandbox?.base.publication ?? null}
+            />
+          </div>
+          <GanttLegend
+            preliminary={pub.planState === 'preliminary'}
+            paused={pub.pauses.length > 0}
+            sandbox={sandbox !== null}
           />
-          <GanttLegend preliminary={pub.planState === 'preliminary'} />
         </>
       )}
 
-      {tab === 'history' && <HistoryList record={record} />}
+      {tab === 'history' && <HistoryView record={record} asOf={asOf} />}
 
       {search.activity && (
         <ActivityPanel

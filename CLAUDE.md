@@ -17,14 +17,17 @@ dependencies.
 - Phase 1 is done: the scheduling engine in `packages/domain` (PLAN §4.2 lists the decisions).
 - Phase 2 is done: workspaces, Tidsmaskine, portfolio list, wizard, plan table, side panel.
 - Phase 3 is done: the interactive Gantt (`apps/web/src/components/gantt`).
-- Next: **Phase 4**, delays and replanning (PLAN §6).
+- Phase 4 is done: whole-plan dialogs, scenario mode (sandbox), history with the slip chart,
+  scenario books in the demo.
+- Next: **Phase 5**, progress tracking and portfolio (PLAN §6).
 
 ## Layout
 
 ```
 apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes), Tailwind v4, shadcn/ui
   data/           WorkspaceRepository: IndexedDB (one database per workspace) and in-memory
-  store/          Zustand workspace store: all plan changes go through `execute(id, command)`
+  store/          Zustand workspace store: all plan changes go through `execute(id, command)`;
+                  in scenario mode they go to the sandbox copy (read records via `selectRecord`)
   lib/clock.ts    the only place that reads the system clock
   components/     publication/ (table, panel, impact dialog), gantt/ (chart; scale.ts and rows.ts
                   are pure and tested), workspace/ (Tidsmaskine), ui/
@@ -33,8 +36,9 @@ packages/domain   Framework-free TypeScript, no build step:
   model/          Zod schemas: template, publication, activity, events
   templates/      master plan data, builder DSL, validator
   engine/         generatePlan, analyzePlan (forecast/slack/critical path), previewReschedule,
-                  shiftPlan, assessHealth; constraints.ts defines FS/SS/FF
-  commands/       commands → { publication, events }; diff-based undo/redo history
+                  shiftPlan, assessHealth, comparePlans; constraints.ts defines FS/SS/FF
+  commands/       commands → { publication, events }; diff-based undo/redo history;
+                  previewCommand; timeline.ts rebuilds past plans from the log (slip chart)
   simulation/     seeded simulateProgress, scenarios and the scenario library
   testing/        test fixtures (not exported)
 docs/             Plan and client-facing notes

@@ -80,6 +80,8 @@ export interface GanttProps {
   onOpenActivity: (id: string) => void
   onRequestChange: (change: ScheduleChange) => void
   onAddDependency: (predecessorId: string, successorId: string) => void
+  /** Scenario mode: the live plan, drawn as ghosts where the scenario differs from it. */
+  compareTo?: Publication | null
 }
 
 export function Gantt(props: GanttProps) {
@@ -244,6 +246,14 @@ export function Gantt(props: GanttProps) {
     () => new Map(impact?.publication.activities.map((a) => [a.id, a]) ?? []),
     [impact],
   )
+  const liveById = useMemo(
+    () => (props.compareTo ? new Map(props.compareTo.activities.map((a) => [a.id, a])) : null),
+    [props.compareTo],
+  )
+  const liveFor = (a: Activity) => {
+    const live = liveById?.get(a.id)
+    return live && (live.deadline !== a.deadline || live.start !== a.start) ? live : undefined
+  }
   const releaseTarget = health.release.target
   const previewRelease = impact?.release.after ?? null
   const previewSlip = impact?.release.slipWorkdays ?? 0
@@ -291,6 +301,7 @@ export function Gantt(props: GanttProps) {
                   preview={
                     ghostIds.has(row.activity.id) ? previewById.get(row.activity.id) : undefined
                   }
+                  live={liveFor(row.activity)}
                   dragging={drag?.activityId === row.activity.id}
                   onPointerDown={startDrag}
                   onKeyDown={onBarKey}
@@ -602,6 +613,7 @@ function ActivityBars({
   baselineDates,
   showCritical,
   preview,
+  live,
   dragging,
   onPointerDown,
   onKeyDown,
@@ -613,6 +625,7 @@ function ActivityBars({
   baselineDates: { start: IsoDate | null; deadline: IsoDate } | undefined
   showCritical: boolean
   preview: Activity | undefined
+  live: Activity | undefined
   dragging: boolean
   onPointerDown: (mode: DragMode, a: Activity) => (e: ReactPointerEvent) => void
   onKeyDown: (a: Activity, draggable: boolean) => (e: KeyboardEvent) => void
@@ -763,6 +776,9 @@ function ActivityBars({
         </span>
       )}
 
+      {/* Scenario mode: where the live plan has this activity */}
+      {live && <PreviewGhost activity={live} scale={scale} variant="live" />}
+
       {/* Live preview of where this activity would go */}
       {preview && <PreviewGhost activity={preview} scale={scale} />}
     </div>
@@ -797,22 +813,43 @@ function BaselineGhost({
   )
 }
 
-function PreviewGhost({ activity: a, scale }: { activity: Activity; scale: Scale }) {
+/** A dashed outline: where a pending change would put the activity, or (`live`) where the
+ * live plan has it while a scenario is open. */
+function PreviewGhost({
+  activity: a,
+  scale,
+  variant = 'preview',
+}: {
+  activity: Activity
+  scale: Scale
+  variant?: 'preview' | 'live'
+}) {
   const { x1, x2 } = barX(a, scale)
+  const style =
+    variant === 'live'
+      ? 'border-dotted border-muted-foreground/70'
+      : 'border-dashed border-primary bg-primary/10'
+  const testId = variant === 'live' ? 'live-ghost' : 'preview-ghost'
+  const title = variant === 'live' ? `${da.sandbox.ghost}: ${formatDate(a.deadline)}` : undefined
   if (a.kind === 'task') {
     return (
       <div
-        className="pointer-events-none absolute top-[6px] h-[18px] rounded border-2 border-dashed border-primary bg-primary/10"
+        className={cn('pointer-events-none absolute top-[6px] h-[18px] rounded border-2', style)}
         style={{ left: x1, width: Math.max(scale.ppd, x2 - x1) }}
-        data-testid="preview-ghost"
+        data-testid={testId}
+        title={title}
       />
     )
   }
   return (
     <div
-      className="pointer-events-none absolute top-1 h-5 w-5 -translate-x-1/2 rounded border-2 border-dashed border-primary"
+      className={cn(
+        'pointer-events-none absolute top-1 h-5 w-5 -translate-x-1/2 rounded border-2',
+        style,
+      )}
       style={{ left: x1 }}
-      data-testid="preview-ghost"
+      data-testid={testId}
+      title={title}
     />
   )
 }

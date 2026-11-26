@@ -13,8 +13,8 @@ postponements.
 Stage A prototype: frontend only, data stored in the browser.
 
 - Phase 0 (foundations), Phase 1 (scheduling engine), Phase 2 (publications, table view, time
-  machine) and Phase 3 (interactive Gantt) are done.
-- Next: Phase 4, delays and replanning.
+  machine), Phase 3 (interactive Gantt) and Phase 4 (delays and replanning) are done.
+- Next: Phase 5, progress tracking and portfolio.
 
 ## Getting started
 
@@ -40,6 +40,13 @@ The UI is in Danish.
   change the duration, or drag from the dot at its end to another activity to add a dependency.
   While dragging, dashed ghosts show everything that would move. Nothing changes until you
   confirm in the dialog that opens on release. The keyboard works too (Tab, ← →, Enter, Esc).
+- **Planlægning** (top right on a book) holds the whole-plan changes, each with a preview of
+  what moves before anything is applied: move the release date, pause (HOLD) and resume, make
+  the plan binding, save a new baseline, and **Afprøv i et scenarie**. Scenario mode works on a
+  copy of the plan: change anything, compare with the real plan (the Gantt shows the real plan
+  as dotted outlines), then apply the changes or discard them. Scenarios are kept in memory only.
+- The **Historik** tab shows how the milestones' forecasts have moved over time (the slip chart),
+  the saved baselines, and the change log with filters.
 - **Masterplan** shows the template itself, read-only.
 
 ### Two datasets
@@ -58,7 +65,13 @@ The datasets are stored separately, so nothing done in the demo affects the real
 The bar at the top of the page sets the demo's date. Moving forward plays every demo book on:
 work starts and finishes, some of it late, and overruns are rescheduled automatically. Moving
 back rebuilds the demo data as of that date, so your own demo changes are lost (you are asked
-first). The reset button rebuilds the demo as of today.
+first). The reset button rebuilds the demo as of today. Time stands still while a scenario is
+open.
+
+**Fra scenarie…** on the Udgivelser page adds a demo book that follows a named story from the
+scenario library (for example "Forfatteren er 3 uger forsinket" or "Fondssvar udebliver → HOLD i
+6 uger"). The book is played up to the demo's date and keeps following the story as you move
+forward in time.
 
 ### Where data is stored
 

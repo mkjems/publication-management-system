@@ -7,7 +7,15 @@ const HATCH =
   'repeating-linear-gradient(135deg, rgb(255 255 255 / 0.35) 0 3px, transparent 3px 7px)'
 
 /** What the marks in the Gantt mean, and how to edit with mouse and keyboard. */
-export function GanttLegend({ preliminary }: { preliminary: boolean }) {
+export function GanttLegend({
+  preliminary,
+  paused,
+  sandbox,
+}: {
+  preliminary: boolean
+  paused?: boolean
+  sandbox?: boolean
+}) {
   const l = da.gantt.legend
   return (
     <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
@@ -41,9 +49,43 @@ export function GanttLegend({ preliminary }: { preliminary: boolean }) {
             {l.preliminary}
           </Item>
         )}
+        {paused && (
+          <Item
+            mark={
+              <span
+                className="h-3 w-5 bg-status-waiting/15 opacity-60"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(135deg, var(--status-waiting) 0 1px, transparent 1px 10px)',
+                }}
+              />
+            }
+          >
+            {l.pause}
+          </Item>
+        )}
+        {sandbox && (
+          <Item
+            mark={
+              <span className="h-3 w-5 rounded-sm border-2 border-dotted border-muted-foreground/70" />
+            }
+          >
+            {l.sandbox}
+          </Item>
+        )}
         <Item mark={<span className="h-3 w-px bg-status-active" />}>{da.gantt.today}</Item>
-        <Item mark={<span className="h-3 w-0 border-l-2 border-primary" />}>
-          {da.gantt.release}
+        <Item
+          mark={
+            <span
+              className={
+                preliminary
+                  ? 'h-3 w-0 border-l-2 border-dashed border-primary/70'
+                  : 'h-3 w-0 border-l-2 border-primary'
+              }
+            />
+          }
+        >
+          {preliminary ? da.gantt.desiredRelease : da.gantt.bindingRelease}
         </Item>
       </div>
       <p className="flex items-start gap-1.5">

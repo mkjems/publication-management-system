@@ -6,7 +6,19 @@ import {
   type PublicationRecord,
 } from '@pms/domain'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ChevronLeft, PauseCircle, Redo2, Trash2, Undo2 } from 'lucide-react'
+import {
+  CalendarClock,
+  ChevronDown,
+  ChevronLeft,
+  FlaskConical,
+  Lock,
+  PauseCircle,
+  PlayCircle,
+  Redo2,
+  Save,
+  Trash2,
+  Undo2,
+} from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
@@ -17,11 +29,20 @@ import {
   SlipBadge,
 } from '@/components/status/status'
 import { Button } from '@/components/ui/button'
-import { usePersonName } from '@/hooks/use-publication'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { usePersonName, useSandbox } from '@/hooks/use-publication'
 import { da } from '@/i18n/da'
 import { formatDate } from '@/lib/format'
 import { useWorkspace } from '@/store'
 import { useFlash } from '@/store/flash'
+import { PlanDialog, type PlanDialogKind } from './plan-dialogs'
+import { ScenarioBanner } from './scenario-banner'
 
 export function PublicationHeader({
   record,
@@ -38,8 +59,12 @@ export function PublicationHeader({
   const show = useFlash((s) => s.show)
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [dialog, setDialog] = useState<PlanDialogKind | null>(null)
+  const openSandbox = useWorkspace((s) => s.openSandbox)
+  const inSandbox = useSandbox(pub.id) !== null
   const { overall, release } = health
   const pause = openPause(pub)
+  const finished = ['released', 'closed', 'no_go'].includes(pub.lifecycle)
 
   const guard = (f: () => void) => () => {
     try {
@@ -68,6 +93,52 @@ export function PublicationHeader({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                {da.planActions.menu}
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setDialog('release')} disabled={finished}>
+                <CalendarClock />
+                {da.planActions.release}
+              </DropdownMenuItem>
+              {pause ? (
+                <DropdownMenuItem onSelect={() => setDialog('resume')}>
+                  <PlayCircle />
+                  {da.planActions.resume}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onSelect={() => setDialog('pause')} disabled={finished}>
+                  <PauseCircle />
+                  {da.planActions.pause}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {pub.planState === 'preliminary' ? (
+                <DropdownMenuItem onSelect={() => setDialog('make_binding')}>
+                  <Lock />
+                  {da.planActions.makeBinding}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onSelect={() => setDialog('rebaseline')}>
+                  <Save />
+                  {da.planActions.rebaseline}
+                </DropdownMenuItem>
+              )}
+              {!inSandbox && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => openSandbox(pub.id)}>
+                    <FlaskConical />
+                    {da.planActions.scenario}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             size="sm"
@@ -99,6 +170,8 @@ export function PublicationHeader({
           </Button>
         </div>
       </div>
+
+      <ScenarioBanner publication={pub} />
 
       {pause && (
         <div className="flex items-center gap-2 rounded-lg border border-status-waiting/50 bg-status-waiting/10 px-4 py-2.5 text-sm">
@@ -147,6 +220,8 @@ export function PublicationHeader({
           </span>
         </Stat>
       </div>
+
+      {dialog && <PlanDialog kind={dialog} publication={pub} onClose={() => setDialog(null)} />}
 
       <ConfirmDialog
         open={confirmDelete}

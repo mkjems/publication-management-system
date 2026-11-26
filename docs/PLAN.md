@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v5 · 2026-11-26 (Phases 1–3 done; see §9 for findings)
+Status: draft v6 · 2026-11-26 (Phases 1–4 done; see §9 for findings)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -452,6 +452,32 @@ Decisions made while building it:
   Playwright fixtures.
 - _Demo:_ "the author is 3 weeks late"; the full impact is visible and resolved in a few clicks.
 
+Decisions made while building it:
+
+- **Previews run the real command.** Commands are pure, so `previewCommand` runs pause, resume
+  or a release change against the current plan with a throwaway context, and `comparePlans`
+  describes the result (moved activities, milestone forecasts, release target and forecast).
+  Preview and apply can never disagree.
+- **Whole-plan changes live in one "Planlægning" menu** on the publication: move the release
+  date, pause/resume, make binding, save a baseline, try a scenario. The postpone dialog for a
+  single activity (table, side panel, Gantt drop) accepts a date or "+N arbejdsdage".
+- **Scenario mode is a fork of the publication's record** (plan and history). While open, every
+  command, undo and redo on that book goes to the copy; the live plan and the portfolio are
+  untouched. Applying replaces the live record with the copy, so each change stays a separate,
+  undoable transaction in the log. Applying is refused if the live record changed meanwhile, and
+  the Tidsmaskine is frozen while a scenario is open. Scenarios are kept in memory only (not
+  persisted). The Gantt draws the live plan as dotted ghosts where the scenario differs.
+- **The slip chart is reconstructed from the log.** Every event has a diff, so undoing the log
+  backwards gives the plan as it was on any day (`planTimeline`). `milestoneTrend` samples it
+  weekly plus on every planning change and runs the forecast as of each date. Six key
+  milestones (the gates, _Manus låst_, _Trykgodkendelse_) get series colours in a fixed order;
+  "Vis alle milepæle" adds the rest as neutral grey lines. The table under the chart is both
+  legend and table view.
+- **Scenario library in the UI:** in the demo, "Fra scenarie…" adds a book that follows a library
+  scenario, played up to the simulated date; the rest of its script plays as time moves on.
+- Not done: Playwright end-to-end tests with the scenarios as fixtures (no Playwright setup yet;
+  the scenarios are covered as engine regression tests and the flows were checked by hand).
+
 ### Phase 5: Progress tracking and portfolio (M)
 
 - Health indicators per activity, phase and publication; % complete per phase.
@@ -555,5 +581,15 @@ badges, forecast and slack tails, critical path, dependency arrows, today/releas
 hatched preliminary plan; drag, resize, keyboard nudge and dependency creation with live
 preview).
 
-Next: Phase 4, delays and replanning: pause/resume and release-date UI, history view with the
-milestone slip chart, scenario mode and the scenario library in the UI.
+Phase 4 is done: release date, pause/resume and binding/baseline dialogs with previews,
+"+N arbejdsdage" in the postpone dialog, scenario mode, the history view with the milestone slip
+chart, baselines and log filters, and scenario books in the demo.
+
+Found while building Phase 4:
+
+- Moving a binding release date or resuming after a pause saves a new baseline each time
+  (§8 question 3: who may re-baseline). In a busy book the baselines list grows quickly; the
+  client may want only some changes to re-baseline.
+- The compression finding from Phase 2 still stands (no `compressible` flag yet).
+
+Next: Phase 5, progress tracking and portfolio.

@@ -23,6 +23,19 @@ export function templateOf(pub: Publication): Template {
   )
 }
 
+/**
+ * The milestones the slip chart colours by default (master plan v1): the gates plus the two
+ * hand-overs the client watches most. Fixed order, so each keeps its colour.
+ */
+export const KEY_MILESTONES = [
+  'm-go',
+  'm-funding',
+  'm-production-start',
+  'm-manuscript-locked',
+  'm-print-approval',
+  'm-release',
+]
+
 export interface PhaseRows {
   phase: PhaseTemplate
   tracks: { track: TrackTemplate; activities: Activity[] }[]

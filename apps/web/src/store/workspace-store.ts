@@ -5,11 +5,13 @@
  */
 import {
   MASTERPLAN_V1,
+  SCENARIOS,
   addDays,
   advanceSimulation,
   generatePlan,
   record,
   redo as redoHistory,
+  scenarioBook,
   seedDemoWorkspace,
   undo as undoHistory,
   emptyHistory,
@@ -35,6 +37,25 @@ export interface NewPublicationInput {
   projectLead: { id: string } | { name: string } | null
 }
 
+export interface NewScenarioBookInput {
+  scenarioId: string
+  workingTitle: string
+  desiredReleaseDate: IsoDate
+  projectLeadId?: string | null
+}
+
+/**
+ * Scenario mode (PLAN §6, Phase 4): a sandbox copy of one publication. Changes to that
+ * publication go to the copy until they are applied to the live plan or discarded. Kept in
+ * memory only.
+ */
+export interface Sandbox {
+  publicationId: string
+  /** The live record when the sandbox was opened. */
+  base: PublicationRecord
+  record: PublicationRecord
+}
+
 export interface WorkspaceState {
   kind: WorkspaceKind
   status: 'loading' | 'ready' | 'error'
@@ -48,10 +69,16 @@ export interface WorkspaceState {
   realToday: IsoDate
   /** The business date for everything that depends on "today". */
   asOf: IsoDate
+  sandbox: Sandbox | null
 
   load(kind?: WorkspaceKind): Promise<void>
   createPublication(input: NewPublicationInput): string
-  /** Runs a domain command on a publication. Throws the command's error, if any. */
+  /** Demo only. Adds a book that follows a scenario from the library, played up to `asOf`. */
+  addScenarioBook(input: NewScenarioBookInput): string
+  /**
+   * Runs a domain command on a publication (on its sandbox copy in scenario mode). Throws the
+   * command's error, if any.
+   */
   execute(
     id: string,
     command: (pub: Publication, ctx: CommandContext) => CommandResult,
@@ -59,6 +86,11 @@ export interface WorkspaceState {
   undo(id: string): void
   redo(id: string): void
   deletePublication(id: string): void
+  /** Opens scenario mode for a publication. Replaces any open sandbox. */
+  openSandbox(id: string): void
+  /** Applies the sandbox to the live plan. Throws if the live plan changed in the meantime. */
+  applySandbox(): void
+  discardSandbox(): void
   /** Demo only. Forward plays the books on; backward rebuilds the demo data as of that date. */
   travelTo(date: IsoDate): void
   /** Demo only. Rebuilds the demo data as of today. */
@@ -85,6 +117,16 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
       by: null,
       newId: deps.newId,
     })
+    /** The record commands for `id` act on: the sandbox copy in scenario mode. */
+    const target = (id: string) => {
+      const sb = get().sandbox
+      return sb?.publicationId === id ? sb.record : mustGet(get().records, id)
+    }
+    const store = (r: PublicationRecord) => {
+      const sb = get().sandbox
+      if (sb?.publicationId === r.publication.id) set({ sandbox: { ...sb, record: r } })
+      else putRecords([r])
+    }
     const fail = (e: unknown) =>
       set({ error: e instanceof Error ? e.message : String(e), status: 'error' })
     const persist = (records: PublicationRecord[]) => {
@@ -105,6 +147,7 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
         kind,
         status: 'ready',
         error: null,
+        sandbox: null,
         people: data.people,
         records,
         order: sortOrder(data.publications),
@@ -134,11 +177,12 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
       simulatedDate: null,
       realToday: today,
       asOf: today,
+      sandbox: null,
 
       load(kind = get().kind) {
         // React StrictMode runs effects twice; share one load per workspace.
         if (inflight?.kind === kind) return inflight.promise
-        set({ kind, status: 'loading', error: null })
+        set({ kind, status: 'loading', error: null, sandbox: null })
         deps.onKindChange?.(kind)
         const run = async () => {
           try {
@@ -206,39 +250,85 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
         return publication.id
       },
 
+      addScenarioBook(input) {
+        if (get().kind !== 'demo') throw new Error('Scenario books exist only in the demo')
+        const scenario = SCENARIOS.find((x) => x.id === input.scenarioId)
+        if (!scenario) throw new Error(`Unknown scenario ${input.scenarioId}`)
+        const r = scenarioBook(scenario, {
+          releaseDate: input.desiredReleaseDate,
+          today: get().asOf,
+          recordedAt: deps.clock.now(),
+          newId: deps.newId,
+          publicationId: deps.newId(),
+          workingTitle: input.workingTitle.trim() || scenario.name,
+          projectLeadId: input.projectLeadId ?? null,
+        })
+        putRecords([r])
+        return r.publication.id
+      },
+
       execute(id, command) {
-        const r = mustGet(get().records, id)
+        const r = target(id)
         const result = command(r.publication, ctx())
         if (result.events.length) {
-          putRecords([
-            { ...r, publication: result.publication, history: record(r.history, result.events) },
-          ])
+          store({
+            ...r,
+            publication: result.publication,
+            history: record(r.history, result.events),
+          })
         }
         return result
       },
 
       undo(id) {
-        const r = mustGet(get().records, id)
+        const r = target(id)
         const result = undoHistory(r.publication, r.history, ctx())
-        putRecords([{ ...r, publication: result.publication, history: result.history }])
+        store({ ...r, publication: result.publication, history: result.history })
       },
 
       redo(id) {
-        const r = mustGet(get().records, id)
+        const r = target(id)
         const result = redoHistory(r.publication, r.history, ctx())
-        putRecords([{ ...r, publication: result.publication, history: result.history }])
+        store({ ...r, publication: result.publication, history: result.history })
       },
 
       deletePublication(id) {
         const records = { ...get().records }
         delete records[id]
-        set({ records, order: get().order.filter((x) => x !== id) })
+        set({
+          records,
+          order: get().order.filter((x) => x !== id),
+          ...(get().sandbox?.publicationId === id ? { sandbox: null } : {}),
+        })
         repo().deletePublication(id).catch(fail)
+      },
+
+      openSandbox(id) {
+        const r = mustGet(get().records, id)
+        set({ sandbox: { publicationId: id, base: r, record: r } })
+      },
+
+      applySandbox() {
+        const sb = get().sandbox
+        if (!sb) return
+        if (get().records[sb.publicationId] !== sb.base) {
+          throw new Error('The live plan has changed since the scenario was opened')
+        }
+        // The sandbox continued the live history, so it simply becomes the live record; each
+        // change in it stays a separate, undoable transaction.
+        set({ sandbox: null })
+        if (sb.record !== sb.base) putRecords([sb.record])
+      },
+
+      discardSandbox() {
+        set({ sandbox: null })
       },
 
       travelTo(date) {
         const { kind, simulatedDate, records } = get()
         if (kind !== 'demo' || !simulatedDate || date === simulatedDate) return
+        // Time stands still while a scenario is open: the sandbox is compared with the live plan.
+        if (get().sandbox) return
         if (date < simulatedDate) {
           const data = seedDemo(date)
           applyData('demo', data)
@@ -319,4 +409,9 @@ function hashString(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0
   return h | 0
+}
+
+/** The record shown for a publication: its sandbox copy while in scenario mode. */
+export function selectRecord(s: WorkspaceState, id: string): PublicationRecord | undefined {
+  return s.sandbox?.publicationId === id ? s.sandbox.record : s.records[id]
 }

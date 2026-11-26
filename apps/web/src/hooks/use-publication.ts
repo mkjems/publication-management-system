@@ -1,9 +1,16 @@
 import { assessHealth, type IsoDate, type Publication } from '@pms/domain'
 import { useMemo } from 'react'
 import { useWorkspace } from '@/store'
+import { selectRecord } from '@/store/workspace-store'
 
+/** The publication's record; its sandbox copy while in scenario mode. */
 export function usePublicationRecord(id: string) {
-  return useWorkspace((s) => s.records[id])
+  return useWorkspace((s) => selectRecord(s, id))
+}
+
+/** The sandbox if it belongs to this publication. */
+export function useSandbox(id: string) {
+  return useWorkspace((s) => (s.sandbox?.publicationId === id ? s.sandbox : null))
 }
 
 /** Health and analysis of a publication as of the workspace date. Recomputed only on change. */

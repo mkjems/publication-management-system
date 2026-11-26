@@ -30,9 +30,13 @@ export function TimeMachine() {
   const realToday = useWorkspace((s) => s.realToday)
   const travelTo = useWorkspace((s) => s.travelTo)
   const resetDemo = useWorkspace((s) => s.resetDemo)
+  const frozen = useWorkspace((s) => s.sandbox !== null)
   const [playing, setPlaying] = useState(false)
   const [pendingBack, setPendingBack] = useState<IsoDate | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+
+  // Opening a scenario stops time (the store ignores travel while a sandbox is open).
+  if (frozen && playing) setPlaying(false)
 
   useEffect(() => {
     if (!playing) return
@@ -74,12 +78,13 @@ export function TimeMachine() {
           </span>
         )}
       </div>
+      {frozen && <span className="text-xs text-muted-foreground">{da.sandbox.timeStopped}</span>}
       <div className="flex flex-wrap items-center gap-1.5 md:ml-auto">
         <Button
           size="sm"
           variant="outline"
           onClick={() => go(cal.addWorkdays(simulatedDate, -5))}
-          disabled={playing}
+          disabled={playing || frozen}
         >
           {da.timeMachine.backWeek}
         </Button>
@@ -87,7 +92,7 @@ export function TimeMachine() {
           type="date"
           aria-label={da.timeMachine.simulated}
           value={simulatedDate}
-          disabled={playing}
+          disabled={playing || frozen}
           onChange={(e) => e.target.value && go(e.target.value)}
           className="h-8 w-38"
         />
@@ -95,7 +100,7 @@ export function TimeMachine() {
           size="sm"
           variant="outline"
           onClick={() => go(addDays(simulatedDate, 1))}
-          disabled={playing}
+          disabled={playing || frozen}
         >
           {da.timeMachine.forwardDay}
         </Button>
@@ -103,7 +108,7 @@ export function TimeMachine() {
           size="sm"
           variant="outline"
           onClick={() => go(cal.addWorkdays(simulatedDate, 5))}
-          disabled={playing}
+          disabled={playing || frozen}
         >
           {da.timeMachine.forwardWeek}
         </Button>
@@ -111,7 +116,7 @@ export function TimeMachine() {
           size="sm"
           variant="outline"
           onClick={() => go(cal.addWorkdays(simulatedDate, 21))}
-          disabled={playing}
+          disabled={playing || frozen}
         >
           {da.timeMachine.forwardMonth}
         </Button>
@@ -119,12 +124,18 @@ export function TimeMachine() {
           size="sm"
           variant={playing ? 'default' : 'outline'}
           onClick={() => setPlaying((p) => !p)}
+          disabled={frozen}
         >
           {playing ? <Pause /> : <Play />}
           {playing ? da.timeMachine.pause : da.timeMachine.play}
         </Button>
         {simulated && (
-          <Button size="sm" variant="ghost" onClick={() => go(realToday)} disabled={playing}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => go(realToday)}
+            disabled={playing || frozen}
+          >
             {da.timeMachine.today}
           </Button>
         )}
@@ -132,7 +143,7 @@ export function TimeMachine() {
           size="sm"
           variant="ghost"
           onClick={() => (hasUserChanges() ? setConfirmReset(true) : resetDemo())}
-          disabled={playing}
+          disabled={playing || frozen}
           title={da.timeMachine.reset}
         >
           <RotateCcw />

@@ -1,12 +1,20 @@
 import 'fake-indexeddb/auto'
-import { CommandError, getCalendar, DEFAULT_CALENDAR, reschedule, setStatus } from '@pms/domain'
+import {
+  CommandError,
+  getCalendar,
+  DEFAULT_CALENDAR,
+  reschedule,
+  setStatus,
+  type CommandContext,
+  type Publication,
+} from '@pms/domain'
 import { describe, expect, it } from 'vitest'
 import {
   IndexedDbWorkspaceRepository,
   MemoryWorkspaceRepository,
   type WorkspaceRepository,
 } from '@/data/repository'
-import { createWorkspaceStore } from './workspace-store'
+import { createWorkspaceStore, selectRecord } from './workspace-store'
 
 const TODAY = '2026-11-26'
 const cal = getCalendar(DEFAULT_CALENDAR)
@@ -215,5 +223,103 @@ describe('IndexedDbWorkspaceRepository', () => {
     expect((await demo.load()).publications).toEqual([])
     await real.deletePublication(id)
     expect((await real.load()).publications).toEqual([])
+  })
+})
+
+describe('workspace store: scenario mode', () => {
+  async function withBook() {
+    const { store, repos } = setup()
+    await store.getState().load()
+    const id = store.getState().createPublication({
+      workingTitle: 'Bog',
+      desiredReleaseDate: '2027-11-05',
+      skipOptional: [],
+      projectLead: null,
+    })
+    return { store, repos, id }
+  }
+  const delay = (workdays: number) => (p: Publication, c: CommandContext) =>
+    reschedule(p, { kind: 'delay', activityId: 'first-draft', workdays }, { strategy: 'absorb' }, c)
+
+  it('sends changes to the sandbox copy and leaves the live plan alone', async () => {
+    const { store, repos, id } = await withBook()
+    const live = store.getState().records[id]!
+    store.getState().openSandbox(id)
+    store.getState().execute(id, delay(10))
+    const s = store.getState()
+    expect(s.records[id]).toBe(live)
+    expect(selectRecord(s, id)!.history.log).toHaveLength(1)
+    expect(selectRecord(s, id)!.publication).not.toEqual(live.publication)
+
+    // Undo works inside the sandbox.
+    store.getState().undo(id)
+    expect(selectRecord(store.getState(), id)!.publication).toEqual(live.publication)
+    store.getState().redo(id)
+
+    store.getState().discardSandbox()
+    expect(selectRecord(store.getState(), id)).toBe(live)
+    await flush()
+    expect(repos.real.data.publications[0]!.history.log).toHaveLength(0)
+  })
+
+  it('applies the sandbox as separate undoable changes', async () => {
+    const { store, repos, id } = await withBook()
+    store.getState().openSandbox(id)
+    store.getState().execute(id, delay(5))
+    store.getState().execute(id, delay(5))
+    const scenario = selectRecord(store.getState(), id)!
+    store.getState().applySandbox()
+    expect(store.getState().sandbox).toBeNull()
+    expect(store.getState().records[id]).toBe(scenario)
+    expect(scenario.history.undoable).toHaveLength(2)
+    await flush()
+    expect(repos.real.data.publications[0]!.history.log).toHaveLength(2)
+  })
+
+  it('refuses to apply over a live plan that changed, and stops time while open', async () => {
+    const { store, id } = await withBook()
+    store.getState().openSandbox(id)
+    store.getState().execute(id, delay(5))
+    // Something changes the live record behind the sandbox's back.
+    const live = store.getState().records[id]!
+    store.setState({ records: { ...store.getState().records, [id]: { ...live } } })
+    expect(() => store.getState().applySandbox()).toThrow('changed')
+
+    const demo = setup('demo')
+    await demo.store.getState().load()
+    const book = demo.store.getState().order[0]!
+    demo.store.getState().openSandbox(book)
+    const date = demo.store.getState().asOf
+    demo.store.getState().travelTo(cal.addWorkdays(date, 5))
+    expect(demo.store.getState().asOf).toBe(date)
+    demo.store.getState().discardSandbox()
+    demo.store.getState().travelTo(cal.addWorkdays(date, 5))
+    expect(demo.store.getState().asOf).toBe(cal.addWorkdays(date, 5))
+  })
+})
+
+describe('workspace store: scenario library', () => {
+  it('adds a demo book that follows a library scenario', async () => {
+    const { store } = setup('demo')
+    await store.getState().load()
+    const asOf = store.getState().asOf
+    const id = store.getState().addScenarioBook({
+      scenarioId: 'funding-hold-6-weeks',
+      workingTitle: 'Havebogen',
+      desiredReleaseDate: cal.addWorkdays(asOf, 230),
+    })
+    const r = store.getState().records[id]!
+    expect(r.publication.workingTitle).toBe('Havebogen')
+    expect(r.simulation!.script.map((e) => e.action.kind)).toEqual(['pause', 'resume'])
+
+    const real = setup('real')
+    await real.store.getState().load()
+    expect(() =>
+      real.store.getState().addScenarioBook({
+        scenarioId: 'on-plan',
+        workingTitle: 'x',
+        desiredReleaseDate: '2027-11-05',
+      }),
+    ).toThrow('demo')
   })
 })

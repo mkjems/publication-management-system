@@ -24,7 +24,7 @@ function RootLayout() {
     <TooltipProvider>
       <div className="flex min-h-svh">
         <AppSidebar />
-        <div className="min-w-0 flex-1">
+        <div className="@container min-w-0 flex-1">
           <MobileNav />
           <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
             {status === 'ready' && <TimeMachine />}

@@ -1,10 +1,11 @@
 import { parseWorkspaceSnapshot, type WorkspaceSnapshot } from '@pms/domain'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { BookOpen, Download, Plus, TriangleAlert, Upload } from 'lucide-react'
+import { BookOpen, Download, FlaskConical, Plus, TriangleAlert, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { PageHeader } from '@/components/page-header'
 import { PortfolioRow } from '@/components/publication/portfolio-row'
+import { ScenarioBookDialog } from '@/components/publication/scenario-book-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { da } from '@/i18n/da'
@@ -20,6 +21,7 @@ function PublicationsPage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const [pendingImport, setPendingImport] = useState<WorkspaceSnapshot | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [scenarioOpen, setScenarioOpen] = useState(false)
 
   function exportWorkspace() {
     const s = useWorkspace.getState()
@@ -70,6 +72,12 @@ function PublicationsPage() {
                 if (file) void readFile(file)
               }}
             />
+            {kind === 'demo' && (
+              <Button variant="outline" onClick={() => setScenarioOpen(true)}>
+                <FlaskConical />
+                {da.scenarioBook.open}
+              </Button>
+            )}
             <Button asChild>
               <Link to="/publications/new">
                 <Plus />
@@ -124,6 +132,8 @@ function PublicationsPage() {
           </table>
         </div>
       )}
+
+      {scenarioOpen && <ScenarioBookDialog onOpenChange={setScenarioOpen} />}
 
       <ConfirmDialog
         open={pendingImport !== null}

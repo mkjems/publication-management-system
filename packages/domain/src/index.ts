@@ -30,12 +30,15 @@ export {
 export * from './engine/analyze'
 export * from './engine/reschedule'
 export * from './engine/health'
+export * from './engine/compare'
 
 // Commands, history
 export type { CommandContext } from './commands/context'
 export type { CommandResult, ChangeMeta } from './commands/transaction'
 export * from './commands/commands'
 export * from './commands/history'
+export * from './commands/preview'
+export * from './commands/timeline'
 export { DiffConflictError, applyDiff, diffPublication, invertDiff } from './commands/diff'
 
 // Simulation
@@ -45,4 +48,10 @@ export { SCENARIOS } from './simulation/library'
 
 // Workspace
 export * from './workspace/workspace'
-export { seedDemoWorkspace, DEMO_BOOKS, DEMO_PEOPLE, type DemoWorkspace } from './workspace/demo'
+export {
+  seedDemoWorkspace,
+  scenarioBook,
+  DEMO_BOOKS,
+  DEMO_PEOPLE,
+  type DemoWorkspace,
+} from './workspace/demo'

@@ -93,17 +93,45 @@ export function seedDemoWorkspace(options: {
   newId: () => string
 }): DemoWorkspace {
   const cal = getCalendar(DEFAULT_CALENDAR)
-  const publications = DEMO_BOOKS.map((book) => {
-    const run = runScenario(book.scenario, {
+  const publications = DEMO_BOOKS.map((book) =>
+    scenarioBook(book.scenario, {
       releaseDate: cal.addWorkdays(options.today, book.releaseInWorkdays),
-      until: options.today,
+      today: options.today,
       recordedAt: options.recordedAt,
       newId: options.newId,
       publicationId: book.id,
       workingTitle: book.title,
       projectLeadId: book.projectLeadId,
-    })
-    return { publication: run.publication, history: run.history, simulation: run.simulation }
-  })
+    }),
+  )
   return { people: DEMO_PEOPLE, publications }
+}
+
+/**
+ * A demo book from a scenario: generated for `releaseDate` and played up to `today`. The rest of
+ * the scenario's script stays in the record, so the book keeps following the story as simulated
+ * time moves on.
+ */
+export function scenarioBook(
+  scenario: Scenario,
+  options: {
+    releaseDate: IsoDate
+    today: IsoDate
+    recordedAt: string
+    newId: () => string
+    publicationId: string
+    workingTitle: string
+    projectLeadId?: string | null
+  },
+): PublicationRecord {
+  const run = runScenario(scenario, {
+    releaseDate: options.releaseDate,
+    until: options.today,
+    recordedAt: options.recordedAt,
+    newId: options.newId,
+    publicationId: options.publicationId,
+    workingTitle: options.workingTitle,
+    projectLeadId: options.projectLeadId ?? null,
+  })
+  return { publication: run.publication, history: run.history, simulation: run.simulation }
 }

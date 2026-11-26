@@ -1,0 +1,33 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Masterplan v1 > reaches the release milestone from every activity before release 1`] = `
+[
+  "early-sketches",
+  "fund-follow-up",
+  "grants-registered",
+  "supplementary-funding",
+  "funding-impact",
+  "budget-revision",
+  "comms-plan",
+  "press-list-started",
+  "launch-planning",
+  "launch-venue",
+  "press-release",
+  "press-kit",
+  "final-press-list",
+  "first-press-contact",
+  "own-channels",
+  "production-follow-up",
+  "media-contact",
+  "digital-review-copies",
+  "launch-final-planning",
+  "mailing-lists",
+  "launch-comms-prep",
+  "complaints",
+  "review-copies",
+  "free-copies",
+  "funder-copies",
+  "press-follow-up",
+  "launch-comms",
+]
+`;

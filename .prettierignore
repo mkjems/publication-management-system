@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+dist
+coverage
+Research
+apps/web/src/routeTree.gen.ts
+# Hand-formatted: one line per activity, mirrors the PDF
+packages/domain/src/templates/masterplan-v1.ts

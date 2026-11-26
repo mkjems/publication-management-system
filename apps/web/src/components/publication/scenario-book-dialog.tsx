@@ -20,6 +20,9 @@ import { useFlash } from '@/store/flash'
 const cal = getCalendar(DEFAULT_CALENDAR)
 /** About six months ahead: the book is mid-production with some history already. */
 const DEFAULT_RELEASE_WORKDAYS = 125
+/** Spacing between release dates when several books are created at once. */
+const SPACING_WORKDAYS = 15
+const MAX_BOOKS = 10
 
 /** Demo only: add a book that follows a named scenario from the library (PLAN §4.3). */
 export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
@@ -27,7 +30,8 @@ export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: bool
   const addScenarioBook = useWorkspace((s) => s.addScenarioBook)
   const show = useFlash((s) => s.show)
   const navigate = useNavigate()
-  const ids = { title: useId(), release: useId() }
+  const ids = { title: useId(), release: useId(), count: useId() }
+  const [count, setCount] = useState(1)
   const [scenarioId, setScenarioId] = useState(SCENARIOS[1]?.id ?? SCENARIOS[0]!.id)
   const [title, setTitle] = useState('')
   const [release, setRelease] = useState(() => cal.addWorkdays(asOf, DEFAULT_RELEASE_WORKDAYS))
@@ -37,13 +41,20 @@ export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: bool
     e.preventDefault()
     if (!release) return
     try {
-      const id = addScenarioBook({
-        scenarioId,
-        workingTitle: title.trim() || scenario.name,
-        desiredReleaseDate: release,
-      })
+      const base = title.trim() || scenario.name
+      const ids = Array.from({ length: count }, (_, i) =>
+        addScenarioBook({
+          scenarioId,
+          workingTitle: count > 1 ? `${base} ${i + 1}` : base,
+          desiredReleaseDate: cal.addWorkdays(release, i * SPACING_WORKDAYS),
+        }),
+      )
       onOpenChange(false)
-      void navigate({ to: '/publications/$publicationId', params: { publicationId: id } })
+      if (ids.length === 1) {
+        void navigate({ to: '/publications/$publicationId', params: { publicationId: ids[0]! } })
+      } else {
+        void navigate({ to: '/' })
+      }
     } catch (err) {
       show(err instanceof Error ? err.message : String(err))
     }
@@ -63,7 +74,7 @@ export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: bool
               <label
                 key={s.id}
                 className={cn(
-                  'flex cursor-pointer gap-2.5 rounded-lg border p-3 text-sm transition-colors',
+                  'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors',
                   scenarioId === s.id ? 'border-ring bg-accent' : 'hover:bg-muted/50',
                 )}
               >
@@ -101,6 +112,23 @@ export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: bool
                 className="w-44"
               />
               <p className="text-xs text-muted-foreground">{da.scenarioBook.releaseHint}</p>
+            </div>
+            <div className="grid content-start gap-2">
+              <Label htmlFor={ids.count}>{da.scenarioBook.count}</Label>
+              <Input
+                id={ids.count}
+                type="number"
+                min={1}
+                max={MAX_BOOKS}
+                value={count}
+                onChange={(e) =>
+                  setCount(
+                    Math.min(MAX_BOOKS, Math.max(1, Math.round(Number(e.target.value)) || 1)),
+                  )
+                }
+                className="w-24"
+              />
+              <p className="text-xs text-muted-foreground">{da.scenarioBook.countHint}</p>
             </div>
           </div>
           <DialogFooter>

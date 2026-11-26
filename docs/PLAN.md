@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v6 · 2026-11-26 (Phases 1–4 done; see §9 for findings)
+Status: draft v7 · 2026-11-26 (Phases 1–5 done; see §9 for findings)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -488,6 +488,40 @@ Decisions made while building it:
   readable when many things slip at once.
 - _Demo:_ the publisher's Monday overview: what is late, what is at risk, what is due this week.
 
+Decisions made while building it:
+
+- **Oversigt** has six tiles (books in progress, overdue activities, at risk, waiting, deadlines
+  this week, releases that slip), the portfolio Gantt, and two work lists: "Kræver
+  opmærksomhed" (overdue and waiting) and "Denne uge" (due or starting by Sunday).
+- **"At risk" counts only work due within two weeks.** The stress test showed why: everything
+  downstream of a slip has negative buffer, so the whole-plan count reached 514 across 11 books.
+- **Portfolio Gantt:** one line per book. Phases are bands in an ordinal ramp of one hue (light =
+  phase 1, dark = phase 11), so books in the same phase in the same week line up; done work is
+  drawn at its actual dates and open work at its forecast. Key milestones, the release target,
+  and the release forecast (red, with a dashed connector) when it is later. Pauses are hatched.
+- **Mine opgaver** lists open work for everyone, a person or a role, in buckets: overdue,
+  waiting, due this week, starting this week, due next week, in progress (`workItems` in the
+  domain). A person matches through the activity's assignees, the book's role assignments, or
+  being its project lead. Paused and stopped books have no current work.
+- **Role assignments** are edited per book (Planlægning → Roller og personer). Assigning the
+  project-lead role also sets the book's project lead.
+- **Funding:** `funding.secured` is always the sum of granted applications. The funding gate
+  (_Finansiering tilstrækkelig_) can only be completed when the minimum is secured or the
+  publisher has accepted the risk; the simulation respects this, so a late grant holds the
+  milestone (and the binding plan) back. Library scenarios carry a funding story (submissions
+  and decisions as scripted events).
+- **GO / HOLD / NO-GO** is one command (`decideGate`): GO completes the gate (resuming the plan,
+  shifted by the hold, if it was on HOLD); HOLD pauses the book with lifecycle "hold"; NO-GO
+  stops it, and the simulation stops playing it. Choosing "Færdig" on the gate opens the
+  decision dialog. Sub-commands are folded into one transaction (`Transaction.include`), so one
+  undo reverts the whole decision.
+- **Stress policy:** most tasks overrun (by 20–100 %), milestones slip more often, and about one
+  task in eight stops to wait for an outside party for 3–10 working days. The library has an
+  "Alt skrider" scenario; "Fra scenarie…" can create up to 10 books at once, 3 weeks apart.
+- Paused, HOLD and NO-GO books show their lifecycle instead of a health badge in the lists.
+  The Udgivelser table also shows funding and the release slip against the original plan.
+- Refused commands now show as a toast on any page, not only on the publication page.
+
 ### Phase 6: Template editor, polish and client validation (M)
 
 - Master plan editor with versioning.
@@ -592,4 +626,18 @@ Found while building Phase 4:
   client may want only some changes to re-baseline.
 - The compression finding from Phase 2 still stands (no `compressible` flag yet).
 
-Next: Phase 5, progress tracking and portfolio.
+Phase 5 is done: the Monday overview with the portfolio Gantt, Mine opgaver, role assignments,
+the funding tab and gate logic, per-phase progress, and the stress policy.
+
+Found while building Phase 5:
+
+- With six stress books the overview stays readable: slipping releases stand out in the
+  portfolio Gantt, and the lists are grouped by urgency. Whole-plan "at risk" counts do not
+  scale (see the Phase 5 decisions); the client should confirm what "at risk" should mean on the
+  overview.
+- Demo data created before Phase 5 has no funding stories or role assignments; reset the demo
+  (the ↺ button in the Tidsmaskine) to get them.
+- The funding gate is enforced; §8 question 6 (how detailed funding tracking should be) is still
+  open. Amounts are DKK only.
+
+Next: Phase 6, template editor, polish and client validation.

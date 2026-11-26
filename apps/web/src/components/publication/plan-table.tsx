@@ -8,7 +8,7 @@ import {
 import { ChevronRight, Lock, Route as RouteIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { KindGlyph } from '@/components/masterplan/kind-glyph'
-import { HealthDot, SlipBadge } from '@/components/status/status'
+import { HealthDot, ProgressBar, SlipBadge } from '@/components/status/status'
 import { Badge } from '@/components/ui/badge'
 import { useCommand } from '@/hooks/use-command'
 import { da } from '@/i18n/da'
@@ -73,7 +73,8 @@ export function PlanTable({
               </span>
               <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
                 <HealthDot state={phaseHealth.state} />
-                <span className="hidden tabular-nums sm:inline">
+                <ProgressBar value={phaseHealth.progress} className="hidden w-20 sm:block" />
+                <span className="hidden w-24 tabular-nums sm:inline">
                   {phaseHealth.done}/{phaseHealth.total - phaseHealth.skipped}{' '}
                   {da.publication.phaseDone}
                 </span>

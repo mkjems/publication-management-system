@@ -90,6 +90,37 @@ describe('scenario library', () => {
     expect(analyzePlan(r.publication, r.snapshots.at(-1)!.date).criticalPath).toEqual([])
   })
 
+  it('funding HOLD: the funding milestone waits for the late grant', () => {
+    const r = get('funding-hold-6-weeks')
+    const granted = r.history.log.find(
+      (e) =>
+        e.type === 'funding_changed' &&
+        (e.payload.status as { to?: string } | undefined)?.to === 'granted' &&
+        e.payload.funder === 'Augustinus Fonden',
+    )!
+    const gate = r.publication.activities.find((a) => a.gate === 'funding_secured')!
+    expect(gate.actualFinish! >= granted.effectiveDate).toBe(true)
+    expect(r.publication.funding.secured).toBe(250_000)
+  })
+
+  it('stress: many slips at once, waits on outside parties, a heavily slipped release', () => {
+    const r = get('stress')
+    const last = r.snapshots.at(-1)!
+    expect(last.releaseSlipWorkdays!).toBeGreaterThan(60)
+    expect(Math.max(...r.snapshots.map((s) => s.atRisk))).toBeGreaterThan(50)
+    expect(
+      r.history.log.some((e) => e.type === 'status_changed' && e.payload.to === 'waiting'),
+    ).toBe(true)
+  })
+
+  it('logs the GO decision as a gate decision', () => {
+    const r = get('on-plan')
+    expect(r.history.log.find((e) => e.type === 'gate_decided')?.payload).toMatchObject({
+      activityId: 'm-go',
+      decision: 'go',
+    })
+  })
+
   it('replays week by week to the same timeline', () => {
     for (const s of SCENARIOS) {
       expect(timeline(get(s.id).snapshots)).toMatchSnapshot(s.id)

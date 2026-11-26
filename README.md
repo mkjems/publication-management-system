@@ -13,8 +13,9 @@ postponements.
 Stage A prototype: frontend only, data stored in the browser.
 
 - Phase 0 (foundations), Phase 1 (scheduling engine), Phase 2 (publications, table view, time
-  machine), Phase 3 (interactive Gantt) and Phase 4 (delays and replanning) are done.
-- Next: Phase 5, progress tracking and portfolio.
+  machine), Phase 3 (interactive Gantt), Phase 4 (delays and replanning) and Phase 5 (progress
+  tracking and portfolio) are done.
+- Next: Phase 6, template editor, polish and client validation.
 
 ## Getting started
 
@@ -29,6 +30,10 @@ pnpm dev          # http://localhost:5173
 
 The UI is in Danish.
 
+- **Oversigt** is the Monday overview: counts of what is late, at risk and due, a portfolio Gantt
+  with one line per book, and lists of what needs attention and what is due this week.
+- **Mine opgaver** shows open work for everyone, one person or one role, across all books. People
+  are linked to a book's roles under Planlægning → Roller og personer.
 - **Udgivelser** lists all books with release date, forecast, progress, health and next
   milestone. **Ny udgivelse** creates a book from the master plan and a desired release date.
 - A book's page shows its plan as a table grouped by phase and track, with the columns from the
@@ -45,6 +50,10 @@ The UI is in Danish.
   the plan binding, save a new baseline, and **Afprøv i et scenarie**. Scenario mode works on a
   copy of the plan: change anything, compare with the real plan (the Gantt shows the real plan
   as dotted outlines), then apply the changes or discard them. Scenarios are kept in memory only.
+- The **Finansiering** tab shows secured funding against the minimum, the applications and their
+  decisions. The milestone _Finansiering tilstrækkelig_ (which makes the plan binding) can only
+  be completed when the minimum is secured or the publisher accepts the risk. Completing the
+  _GO / HOLD / NO-GO_ milestone asks for the decision; HOLD pauses the book.
 - The **Historik** tab shows how the milestones' forecasts have moved over time (the slip chart),
   the saved baselines, and the change log with filters.
 - **Masterplan** shows the template itself, read-only.
@@ -71,7 +80,8 @@ open.
 **Fra scenarie…** on the Udgivelser page adds a demo book that follows a named story from the
 scenario library (for example "Forfatteren er 3 uger forsinket" or "Fondssvar udebliver → HOLD i
 6 uger"). The book is played up to the demo's date and keeps following the story as you move
-forward in time.
+forward in time. "Alt skrider" with several books is a stress test for the overview. Demo data
+from before Phase 5 lacks funding and roles; reset the demo to get them.
 
 ### Where data is stored
 

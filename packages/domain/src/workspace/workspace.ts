@@ -22,10 +22,11 @@ export const HistorySchema = z.object({
 export const SimulationPolicySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('on_plan') }),
   z.object({ kind: z.literal('realistic') }),
+  z.object({ kind: z.literal('stress') }),
   z.object({
     kind: z.literal('custom'),
     delays: z.record(z.string(), z.int()),
-    base: z.enum(['on_plan', 'realistic']).optional(),
+    base: z.enum(['on_plan', 'realistic', 'stress']).optional(),
   }),
 ]) satisfies z.ZodType<SimulationPolicy>
 

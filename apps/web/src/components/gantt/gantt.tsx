@@ -545,10 +545,14 @@ function Row({
           <HealthDot state={ph.state} />
         </button>
         <div className="relative" style={{ width: scale.width }}>
+          {/* Phase band, filled to the share of work done */}
           <div
-            className="absolute top-3 h-2.5 rounded-sm bg-phase-band"
+            className="absolute top-3 h-2.5 overflow-hidden rounded-sm bg-phase-band"
             style={{ left: x1, width: Math.max(2, x2 - x1) }}
-          />
+            title={`${Math.round(ph.progress * 100)} % ${da.publication.phaseDone}`}
+          >
+            <div className="h-full bg-status-done/70" style={{ width: `${ph.progress * 100}%` }} />
+          </div>
         </div>
       </div>
     )

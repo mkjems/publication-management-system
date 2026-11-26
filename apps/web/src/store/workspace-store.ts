@@ -73,6 +73,8 @@ export interface WorkspaceState {
 
   load(kind?: WorkspaceKind): Promise<void>
   createPublication(input: NewPublicationInput): string
+  /** Adds a person to the workspace and returns them. */
+  addPerson(name: string): Person
   /** Demo only. Adds a book that follows a scenario from the library, played up to `asOf`. */
   addScenarioBook(input: NewScenarioBookInput): string
   /**
@@ -248,6 +250,20 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
           },
         ])
         return publication.id
+      },
+
+      addPerson(name) {
+        const person: Person = {
+          id: deps.newId(),
+          name: name.trim(),
+          email: null,
+          defaultRoles: [],
+        }
+        if (!person.name) throw new Error('A person needs a name')
+        const people = [...get().people, person]
+        set({ people })
+        repo().savePeople(people).catch(fail)
+        return person
       },
 
       addScenarioBook(input) {

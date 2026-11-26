@@ -1,3 +1,4 @@
+import { fundingStatus, getCalendar, originalBaseline } from '@pms/domain'
 import { Link } from '@tanstack/react-router'
 import {
   HealthBadge,
@@ -8,7 +9,7 @@ import {
 } from '@/components/status/status'
 import { useHealth, usePersonName, usePublicationRecord } from '@/hooks/use-publication'
 import { da } from '@/i18n/da'
-import { formatDate, formatDateCompact } from '@/lib/format'
+import { formatDate, formatDateCompact, formatMoney } from '@/lib/format'
 import { nextMilestone } from '@/lib/publication'
 import { useWorkspace } from '@/store'
 
@@ -20,6 +21,13 @@ export function PortfolioRow({ id }: { id: string }) {
   const lead = usePersonName(pub.projectLeadId)
   const next = nextMilestone(pub)
   const { overall, release } = health
+  const funding = fundingStatus(pub, asOf)
+  const base = originalBaseline(pub)
+  const slipVsOriginal = base
+    ? getCalendar(pub.calendar).workdaysBetween(base.releaseDate, release.target)
+    : null
+  const stopped = ['no_go', 'closed'].includes(pub.lifecycle)
+  const paused = health.paused || pub.lifecycle === 'hold'
 
   return (
     <tr className="border-t align-top first:border-t-0 hover:bg-muted/40">
@@ -49,6 +57,27 @@ export function PortfolioRow({ id }: { id: string }) {
           <SlipBadge workdays={release.slipWorkdays} />
         </span>
       </td>
+      <td className="px-3 py-3 tabular-nums">
+        {slipVsOriginal === null ? (
+          <span className="text-muted-foreground">–</span>
+        ) : (
+          <SlipBadge workdays={slipVsOriginal} showZero title={da.publications.slipHint} />
+        )}
+      </td>
+      <td className="px-3 py-3 text-xs whitespace-nowrap tabular-nums">
+        {funding.minimumRequired === 0 && pub.funding.applications.length === 0 ? (
+          <span className="text-muted-foreground">–</span>
+        ) : (
+          <>
+            <div className={funding.sufficient ? undefined : 'text-status-late'}>
+              {formatMoney(funding.secured)}
+            </div>
+            <div className="text-muted-foreground">
+              {da.funding.minimum.toLowerCase()} {formatMoney(funding.minimumRequired)}
+            </div>
+          </>
+        )}
+      </td>
       <td className="px-3 py-3">
         <ProgressBar value={overall.progress} className="mt-1.5" />
         <div className="mt-1 text-xs text-muted-foreground tabular-nums">
@@ -56,8 +85,12 @@ export function PortfolioRow({ id }: { id: string }) {
         </div>
       </td>
       <td className="px-3 py-3">
-        <HealthBadge state={overall.state} />
-        {(overall.late > 0 || overall.atRisk > 0 || overall.waiting > 0) && (
+        {paused || stopped ? (
+          <LifecycleBadge lifecycle={pub.lifecycle} />
+        ) : (
+          <HealthBadge state={overall.state} />
+        )}
+        {!stopped && (overall.late > 0 || overall.atRisk > 0 || overall.waiting > 0) && (
           <div className="mt-1 text-xs text-muted-foreground tabular-nums">
             {[
               overall.late && `${overall.late} forsinket`,

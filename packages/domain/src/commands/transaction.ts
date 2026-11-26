@@ -63,6 +63,16 @@ export class Transaction {
     this.current = next
   }
 
+  /**
+   * Adds the events of a sub-command that was run on `this.publication` with the same context,
+   * so they belong to this transaction (one undo reverts them all).
+   */
+  include(r: CommandResult): void {
+    if (!r.events.length) return
+    for (const e of r.events) this.events.push({ ...e, txId: this.txId })
+    this.current = r.publication
+  }
+
   result(): CommandResult {
     return { publication: this.current, events: [...this.events] }
   }

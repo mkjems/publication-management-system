@@ -301,7 +301,7 @@ function ResumeDialog({ publication: pub, onOpenChange }: DialogProps) {
               <label
                 key={k}
                 className={cn(
-                  'flex cursor-pointer gap-2.5 rounded-lg border p-3 text-sm transition-colors',
+                  'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors',
                   modeKind === k ? 'border-ring bg-accent' : 'hover:bg-muted/50',
                 )}
               >

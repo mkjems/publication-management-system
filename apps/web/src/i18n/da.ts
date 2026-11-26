@@ -11,7 +11,6 @@ export const da = {
     myWork: 'Mine opgaver',
     masterplan: 'Masterplan',
   },
-  comingSoon: 'Kommer snart',
   masterplan: {
     title: 'Masterplan',
     phases: 'faser',
@@ -92,7 +91,10 @@ export const da = {
       progress: 'Fremdrift',
       health: 'Sundhed',
       next: 'Næste milepæl',
+      slip: 'Afvigelse',
+      funding: 'Finansiering',
     },
+    slipHint: 'Udgivelsesdatoen i forhold til den oprindelige plan (arbejdsdage)',
     projectLead: 'Projektansvarlig',
   },
 
@@ -124,7 +126,7 @@ export const da = {
   publication: {
     notFound: 'Udgivelsen findes ikke',
     back: 'Alle udgivelser',
-    tabs: { table: 'Tabel', gantt: 'Gantt', history: 'Historik' },
+    tabs: { table: 'Tabel', gantt: 'Gantt', funding: 'Finansiering', history: 'Historik' },
     target: 'Udgivelsesdato',
     desired: 'ønsket',
     binding: 'bindende',
@@ -306,6 +308,147 @@ export const da = {
     makeBinding: 'Gør planen bindende…',
     rebaseline: 'Gem ny baseline…',
     scenario: 'Afprøv i et scenarie',
+    roles: 'Roller og personer…',
+  },
+
+  overview: {
+    description:
+      'Mandagsoverblikket: hvad er forsinket, hvad er i risiko, og hvad skal ske i denne uge.',
+    allPublications: 'Se alle udgivelser',
+    tiles: {
+      active: 'Bøger i gang',
+      late: 'Forsinkede aktiviteter',
+      atRisk: 'I risiko',
+      waiting: 'Afventer',
+      dueThisWeek: 'Deadline denne uge',
+      slipping: 'Udgivelser der skrider',
+    },
+    tileHint: {
+      active: (paused: number) => (paused ? `${paused} på pause` : 'ingen på pause'),
+      slipping: 'prognosen ligger efter udgivelsesdatoen',
+      atRisk: 'med deadline de næste 2 uger',
+    },
+    gantt: 'Porteføljen',
+    ganttHint:
+      'Én linje pr. bog med faserne, milepælene og udgivelsen. Samme farve i samme uge betyder, at flere bøger er i samme fase på én gang.',
+    attention: 'Kræver opmærksomhed',
+    attentionHint: 'Forsinkede og ventende aktiviteter på tværs af bøgerne.',
+    thisWeek: 'Denne uge',
+    thisWeekHint: 'Deadlines og opstarter frem til søndag.',
+    nothingAttention: 'Intet er forsinket eller venter. 🎉',
+    nothingThisWeek: 'Ingen deadlines eller opstarter i denne uge.',
+    showAll: (n: number) => `Vis alle (${n})`,
+    empty: 'Ingen udgivelser endnu.',
+  },
+
+  portfolioGantt: {
+    phase: (n: number, name: string) => `Fase ${n}: ${name}`,
+    phases: 'Faser 1 → 11',
+    release: 'Udgivelse',
+    forecast: 'Prognose for udgivelsen',
+    milestone: 'Milepæl',
+    today: 'I dag',
+    pause: 'Pause',
+    stopped: 'Stoppet',
+  },
+
+  myWork: {
+    description:
+      'Det, der er forsinket, venter eller skal ske i denne og næste uge, på tværs af alle bøger.',
+    who: 'Vis for',
+    everyone: 'Alle',
+    people: 'Personer',
+    roles: 'Roller',
+    nothing: 'Intet at gøre lige nu.',
+    noPeople:
+      'Personer tilknyttes en bog under Planlægning → Roller og personer. Indtil da kan du vælge en rolle.',
+    columns: {
+      activity: 'Aktivitet',
+      publication: 'Udgivelse',
+      responsible: 'Ansvarlig',
+      deadline: 'Deadline',
+      forecast: 'Prognose',
+      status: 'Status',
+    },
+  },
+
+  funding: {
+    title: 'Finansiering',
+    minimum: 'Minimum',
+    minimumHint: 'Det beløb, der skal være sikret, før udgivelsesdatoen kan blive bindende.',
+    secured: 'Sikret',
+    pending: 'Afventer svar',
+    planned: 'Planlagt',
+    gap: 'Mangler',
+    sufficient: 'Finansieringen er tilstrækkelig',
+    riskAcceptedState: 'Forlaget har godkendt risikoen',
+    insufficient: (gap: string) => `Mangler ${gap} for at nå minimum`,
+    gateDone: 'Milepælen "Finansiering tilstrækkelig" er nået; planen er bindende.',
+    gateOpen: 'Milepælen "Finansiering tilstrækkelig" kan godkendes.',
+    gateBlocked: 'Milepælen "Finansiering tilstrækkelig" kan ikke godkendes endnu.',
+    riskAccepted: 'Forlaget godkender risikoen',
+    riskAcceptedHint: 'Planen kan blive bindende, selv om minimum ikke er nået.',
+    riskReason: 'Hvorfor godkendes risikoen?',
+    applications: 'Ansøgninger',
+    noApplications: 'Ingen ansøgninger endnu.',
+    add: 'Tilføj ansøgning',
+    edit: 'Redigér ansøgning',
+    remove: 'Fjern',
+    removeConfirm: (funder: string) => `Fjern ansøgningen til ${funder}?`,
+    overdue: 'Svaret er udeblevet',
+    nextDecision: (funder: string, date: string) => `Næste svar: ${funder}, forventet ${date}`,
+    pause: 'Sæt projektet på pause…',
+    columns: {
+      funder: 'Fond',
+      amount: 'Beløb',
+      status: 'Status',
+      submitted: 'Indsendt',
+      expected: 'Forventet svar',
+      decided: 'Svar',
+      conditions: 'Vilkår',
+    },
+    fields: {
+      funder: 'Fond eller bidragyder',
+      amount: 'Beløb (kr.)',
+      status: 'Status',
+      submitted: 'Indsendt',
+      expected: 'Forventet svar',
+      decided: 'Svar modtaget',
+      conditions: 'Vilkår og bemærkninger',
+    },
+    save: 'Gem',
+    gateNotSufficient:
+      'Finansieringen er ikke på plads: minimum er ikke nået, og risikoen er ikke godkendt. Se fanen Finansiering.',
+  },
+
+  gate: {
+    title: 'GO / HOLD / NO-GO',
+    description:
+      'Beslutningen om, hvorvidt projektet går videre. GO sætter produktionsforberedelsen i gang; HOLD sætter projektet på pause, til der kan træffes en beslutning; NO-GO stopper projektet.',
+    go: { label: 'GO', hint: 'Projektet går videre.' },
+    hold: {
+      label: 'HOLD',
+      hint: 'Projektet sættes på pause. Når der siden besluttes GO, flyttes resten af planen med pausens længde.',
+    },
+    no_go: {
+      label: 'NO-GO',
+      hint: 'Projektet stoppes. Planen bevares, men intet planlægges videre.',
+    },
+    reasonPlaceholder: 'Fx Afventer svar fra fonden',
+    reasonRequired: 'HOLD og NO-GO kræver en begrundelse.',
+    apply: 'Træf beslutning',
+    decide: 'Træf beslutning…',
+  },
+
+  roles: {
+    title: 'Roller og personer',
+    description:
+      'Hvem varetager hvilke roller på denne bog? Det bruges i Mine opgaver. Projektansvarlig sættes også her.',
+    nobody: 'Ingen',
+    addPerson: 'Ny person',
+    addPersonPlaceholder: 'Navn',
+    add: 'Tilføj',
+    done: 'Luk',
   },
 
   comparison: {
@@ -409,6 +552,8 @@ export const da = {
     releaseDate: 'Ønsket udgivelsesdato',
     releaseHint: 'Ligger udgivelsen tæt på, er bogen allerede godt i gang.',
     create: 'Opret bog',
+    count: 'Antal bøger',
+    countHint: 'Flere bøger får hver sin udgivelsesdato med 3 ugers mellemrum.',
   },
 } as const
 
@@ -495,8 +640,29 @@ export const EVENT_LABELS = {
   dependency_added: 'Afhængighed tilføjet',
   dependency_removed: 'Afhængighed fjernet',
   activity_updated: 'Redigeret',
+  funding_changed: 'Finansiering',
+  gate_decided: 'Beslutning',
+  roles_assigned: 'Roller',
   undone: 'Fortrudt',
   redone: 'Gentaget',
+} as const
+
+export const FUNDING_STATUS_LABELS = {
+  planned: 'Planlagt',
+  submitted: 'Indsendt',
+  granted: 'Bevilget',
+  rejected: 'Afslået',
+} as const
+
+export const GATE_DECISION_LABELS = { go: 'GO', hold: 'HOLD', no_go: 'NO-GO' } as const
+
+export const WORK_BUCKET_LABELS = {
+  overdue: 'Forsinket',
+  waiting: 'Afventer',
+  due_this_week: 'Deadline denne uge',
+  starting_this_week: 'Starter denne uge',
+  due_next_week: 'Deadline næste uge',
+  in_progress: 'I gang',
 } as const
 
 export const PUSH_REASON_LABELS = {

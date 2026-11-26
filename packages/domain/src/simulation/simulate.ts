@@ -8,7 +8,8 @@
  */
 import { addDays } from '../calendar/dates'
 import { getCalendar, type WorkCalendar } from '../calendar/calendar'
-import { reschedule, setStatus } from '../commands/commands'
+import { decideGate, reschedule, setStatus } from '../commands/commands'
+import { isFundingSufficient } from '../engine/funding'
 import type { CommandContext } from '../commands/context'
 import type { CommandResult } from '../commands/transaction'
 import type { IsoDate } from '../model/common'
@@ -23,8 +24,17 @@ export type SimulationPolicy =
   | { kind: 'on_plan' }
   /** Some tasks overrun, mostly long ones and those that depend on authors, images or print. */
   | { kind: 'realistic' }
+  /**
+   * Many slips at once: most tasks overrun, milestones slip more often, and some work stops to
+   * wait for an outside party for a while. For checking that the overviews stay readable.
+   */
+  | { kind: 'stress' }
   /** Fixed overruns in working days for some tasks; everything else follows `base`. */
-  | { kind: 'custom'; delays: Record<string, number>; base?: 'on_plan' | 'realistic' }
+  | {
+      kind: 'custom'
+      delays: Record<string, number>
+      base?: 'on_plan' | 'realistic' | 'stress'
+    }
 
 /** Expected finish date of each started task, fixed when it starts. */
 export type SimulationState = Record<string, IsoDate>
@@ -60,20 +70,28 @@ const SLOW_ROLES: RoleId[] = ['author', 'picture-editor', 'photographer', 'print
 /** Working days a task overruns its duration under a policy. */
 export function taskOverrun(policy: SimulationPolicy, seed: number, a: Activity): number {
   if (policy.kind === 'custom' && policy.delays[a.id] !== undefined) return policy.delays[a.id]!
-  const kind = policy.kind === 'custom' ? (policy.base ?? 'on_plan') : policy.kind
+  const kind = baseKind(policy)
   if (kind === 'on_plan') return 0
   const rng = rngFor(seed, `overrun:${a.id}`)
   const slow = a.responsible.roles.some((r) => SLOW_ROLES.includes(r)) ? 1.5 : 1
-  const p = Math.min(0.8, (0.15 + a.durationWorkdays / 50) * slow)
+  const stress = kind === 'stress'
+  const p = Math.min(stress ? 0.9 : 0.8, ((stress ? 0.4 : 0.15) + a.durationWorkdays / 50) * slow)
   if (rng() >= p) return 0
-  return Math.max(1, Math.round(a.durationWorkdays * (0.1 + 0.4 * rng()) * slow))
+  const size = stress ? 0.2 + 0.8 * rng() : 0.1 + 0.4 * rng()
+  return Math.max(1, Math.round(a.durationWorkdays * size * slow))
+}
+
+function baseKind(policy: SimulationPolicy): 'on_plan' | 'realistic' | 'stress' {
+  return policy.kind === 'custom' ? (policy.base ?? 'on_plan') : policy.kind
 }
 
 /** Chance that a deadline or milestone that is ready slips by another day. */
 function pointSlipChance(policy: SimulationPolicy): number {
-  const kind = policy.kind === 'custom' ? (policy.base ?? 'on_plan') : policy.kind
-  return kind === 'realistic' ? 0.15 : 0
+  return { on_plan: 0, realistic: 0.15, stress: 0.3 }[baseKind(policy)]
 }
+
+/** Stress only: chance that a task, when it starts, stops to wait for an outside party. */
+const STRESS_WAIT_CHANCE = 0.12
 
 export function reasonCategoryFor(a: Activity): ReasonCategory {
   const role = a.responsible.roles[0]
@@ -117,6 +135,7 @@ export function simulateProgress(pub: Publication, options: SimulateOptions): Si
 
   for (let d = options.from; d <= options.to; d = addDays(d, 1)) {
     if (!cal.isWorkingDay(d) || openPause(current)) continue
+    if (current.lifecycle === 'no_go' || current.lifecycle === 'closed') break
     const ctx: CommandContext = {
       asOf: d,
       recordedAt: options.recordedAt,
@@ -140,7 +159,13 @@ export function simulateProgress(pub: Publication, options: SimulateOptions): Si
       if (a.kind !== 'task') {
         if (d < a.deadline || !view.pointReady(a, today)) continue
         if (rngFor(options.seed, `point:${a.id}:${d}`)() < pointSlipChance(options.policy)) continue
-        apply(setStatus(current, id, 'done', ctx))
+        // The funding gate waits until the money is there (or the risk is accepted).
+        if (a.gate === 'funding_secured' && !isFundingSufficient(current)) continue
+        apply(
+          a.gate === 'go_hold_nogo'
+            ? decideGate(current, id, 'go', ctx)
+            : setStatus(current, id, 'done', ctx),
+        )
         continue
       }
 
@@ -148,6 +173,20 @@ export function simulateProgress(pub: Publication, options: SimulateOptions): Si
         if (d < a.start! || !view.canStart(a, today - 1)) continue
         apply(setStatus(current, id, 'in_progress', ctx))
         a = byId.get(id)!
+        const rng = rngFor(options.seed, `wait:${a.id}`)
+        if (baseKind(options.policy) === 'stress' && rng() < STRESS_WAIT_CHANCE) {
+          const until = cal.addWorkdays(d, 3 + Math.floor(rng() * 8))
+          // The work itself happens after the wait.
+          state[id] = cal.dateOf(
+            cal.ordinal(until) + a.durationWorkdays + taskOverrun(options.policy, options.seed, a),
+          )
+          apply(
+            setStatus(current, id, 'waiting', ctx, {
+              waitingFor: { text: 'Afventer ekstern part (simuleret)', expectedDate: until },
+            }),
+          )
+          continue
+        }
       }
 
       // Fixed when the work starts, so later replanning (which stretches the task) does not

@@ -168,7 +168,7 @@ export function ImpactDialog({
                 <label
                   key={s}
                   className={cn(
-                    'flex cursor-pointer gap-2.5 rounded-lg border p-3 text-sm transition-colors',
+                    'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm transition-colors',
                     strategy === s ? 'border-ring bg-accent' : 'hover:bg-muted/50',
                   )}
                 >

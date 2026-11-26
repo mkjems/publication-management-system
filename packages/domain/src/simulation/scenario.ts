@@ -17,6 +17,7 @@ import {
   type ResumeMode,
 } from '../commands/commands'
 import type { CommandContext } from '../commands/context'
+import { updateFundingApplication } from '../commands/funding'
 import { emptyHistory, record, type History } from '../commands/history'
 import type { CommandResult } from '../commands/transaction'
 import { generatePlan } from '../engine/generate'
@@ -24,7 +25,8 @@ import { assessHealth } from '../engine/health'
 import type { RescheduleOptions, ScheduleChange } from '../engine/reschedule'
 import type { ActivityStatus, IsoDate } from '../model/common'
 import type { ReasonCategory } from '../model/events'
-import type { Publication, WaitingFor } from '../model/publication'
+import type { FundingApplication, Publication, WaitingFor } from '../model/publication'
+import type { RoleId } from '../model/roles'
 import type { Template } from '../model/template'
 import { MASTERPLAN_V1 } from '../templates/masterplan-v1'
 import { simulateProgress, type SimulationPolicy, type SimulationState } from './simulate'
@@ -59,7 +61,23 @@ export interface Scenario {
   replan?: boolean
   /** Optional template activities this book skips. */
   skipOptional?: string[]
+  /** Funding story: applications are submitted and decided on the given dates. */
+  funding?: ScenarioFunding
   events: { at: RelativeDate; action: ScenarioAction }[]
+}
+
+export interface ScenarioFunding {
+  /** DKK. */
+  minimumRequired: number
+  applications: {
+    funder: string
+    amount: number
+    submit: RelativeDate
+    /** When the decision is expected (shown while waiting). Default: `decision`. */
+    expectedDecision?: RelativeDate
+    decision: RelativeDate
+    outcome: 'granted' | 'rejected'
+  }[]
 }
 
 export interface ScenarioSnapshot {
@@ -89,6 +107,7 @@ export interface ScenarioRunOptions {
   publicationId?: string
   workingTitle?: string
   projectLeadId?: string | null
+  roleAssignments?: Partial<Record<RoleId, string[]>>
 }
 
 /** A scripted action with absolute dates, ready to run. */
@@ -96,6 +115,12 @@ export type ScriptAction =
   | Exclude<ScenarioAction, { kind: 'resume' } | { kind: 'change_release' }>
   | { kind: 'resume'; mode: ResumeMode }
   | { kind: 'change_release'; releaseDate: IsoDate; reason: string }
+  | {
+      kind: 'funding'
+      applicationId: string
+      status: 'submitted' | 'granted' | 'rejected'
+      expectedDecisionAt?: IsoDate
+    }
 
 /** Everything needed to keep playing a book forward in time. */
 export interface SimulationSetup {
@@ -120,20 +145,29 @@ export interface ScenarioRun extends SimulatedBook {
 export function runScenario(scenario: Scenario, options: ScenarioRunOptions): ScenarioRun {
   let n = 0
   const newId = options.newId ?? (() => `${scenario.id}-${++n}`)
-  const { publication } = generatePlan({
+  const generated = generatePlan({
     id: options.publicationId ?? scenario.id,
     workingTitle: options.workingTitle ?? scenario.name,
     template: options.template ?? MASTERPLAN_V1,
     desiredReleaseDate: options.releaseDate,
     projectLeadId: options.projectLeadId ?? null,
+    ...(options.roleAssignments ? { roleAssignments: options.roleAssignments } : {}),
     ...(scenario.skipOptional ? { skipOptional: scenario.skipOptional } : {}),
-  })
-  const cal = getCalendar(publication.calendar)
+  }).publication
+  const cal = getCalendar(generated.calendar)
   const resolve = (r: RelativeDate): IsoDate =>
-    cal.addWorkdays(
-      r.from === 'kickoff' ? publication.kickoffDate : options.releaseDate,
-      r.workdays,
-    )
+    cal.addWorkdays(r.from === 'kickoff' ? generated.kickoffDate : options.releaseDate, r.workdays)
+  const funding = fundingSetup(scenario, generated.id, resolve)
+  const publication: Publication = funding
+    ? {
+        ...generated,
+        funding: {
+          ...generated.funding,
+          minimumRequired: funding.minimumRequired,
+          applications: funding.applications,
+        },
+      }
+    : generated
   const until = options.until ?? cal.addWorkdays(options.releaseDate, 70)
   const every = options.snapshotEveryWorkdays ?? 5
 
@@ -144,10 +178,13 @@ export function runScenario(scenario: Scenario, options: ScenarioRunOptions): Sc
       policy: scenario.policy,
       seed: scenario.seed,
       replan: scenario.replan ?? true,
-      script: scenario.events.map((e) => ({
-        on: resolve(e.at),
-        action: resolveAction(e.action, resolve),
-      })),
+      script: [
+        ...scenario.events.map((e) => ({
+          on: resolve(e.at),
+          action: resolveAction(e.action, resolve),
+        })),
+        ...(funding?.script ?? []),
+      ].sort((a, b) => a.on.localeCompare(b.on)),
       state: {},
     },
   }
@@ -166,6 +203,46 @@ export function runScenario(scenario: Scenario, options: ScenarioRunOptions): Sc
     },
   })
   return { ...book, snapshots }
+}
+
+/** Initial (planned) applications and the scripted submissions and decisions. */
+function fundingSetup(
+  scenario: Scenario,
+  publicationId: string,
+  resolve: (r: RelativeDate) => IsoDate,
+) {
+  if (!scenario.funding) return null
+  const applications: FundingApplication[] = []
+  const script: { on: IsoDate; action: ScriptAction }[] = []
+  scenario.funding.applications.forEach((a, i) => {
+    const id = `${publicationId}-funding-${i + 1}`
+    applications.push({
+      id,
+      funder: a.funder,
+      amount: a.amount,
+      status: 'planned',
+      submittedAt: null,
+      expectedDecisionAt: null,
+      decidedAt: null,
+      conditions: '',
+    })
+    script.push(
+      {
+        on: resolve(a.submit),
+        action: {
+          kind: 'funding',
+          applicationId: id,
+          status: 'submitted',
+          expectedDecisionAt: resolve(a.expectedDecision ?? a.decision),
+        },
+      },
+      {
+        on: resolve(a.decision),
+        action: { kind: 'funding', applicationId: id, status: a.outcome },
+      },
+    )
+  })
+  return { minimumRequired: scenario.funding.minimumRequired, applications, script }
 }
 
 function resolveAction(
@@ -276,6 +353,16 @@ function runAction(pub: Publication, action: ScriptAction, ctx: CommandContext):
         reason: action.reason,
         acceptConflicts: true,
       })
+    case 'funding':
+      return updateFundingApplication(
+        pub,
+        action.applicationId,
+        {
+          status: action.status,
+          ...(action.expectedDecisionAt ? { expectedDecisionAt: action.expectedDecisionAt } : {}),
+        },
+        ctx,
+      )
   }
 }
 

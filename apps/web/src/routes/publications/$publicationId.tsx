@@ -7,12 +7,13 @@ import {
   type ScheduleChange,
 } from '@pms/domain'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ChevronsDownUp, ChevronsUpDown, Search, TriangleAlert, X } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Gantt } from '@/components/gantt/gantt'
 import { GanttLegend } from '@/components/gantt/legend'
 import { ZOOMS, type Zoom } from '@/components/gantt/scale'
 import { ActivityPanel } from '@/components/publication/activity-panel'
+import { FundingView } from '@/components/publication/funding-view'
 import { HistoryView } from '@/components/publication/history-view'
 import { ImpactDialog } from '@/components/publication/impact-dialog'
 import { PlanTable } from '@/components/publication/plan-table'
@@ -29,7 +30,7 @@ import { useWorkspace } from '@/store'
 import { selectRecord } from '@/store/workspace-store'
 import { useFlash } from '@/store/flash'
 
-const TABS = ['table', 'gantt', 'history'] as const
+const TABS = ['table', 'gantt', 'funding', 'history'] as const
 type Tab = (typeof TABS)[number]
 const FILTERS = ['all', 'problems', 'open'] as const
 type Filter = (typeof FILTERS)[number]
@@ -84,8 +85,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   const navigate = useNavigate({ from: Route.fullPath })
   const asOf = useWorkspace((s) => s.asOf)
   const health = useHealth(pub, asOf)
-  const flash = useFlash()
-  const clearFlash = useFlash((s) => s.clear)
+  const showFlash = useFlash((s) => s.show)
   const [toggled, setToggled] = useState<Set<string>>(() => new Set())
   const [pending, setPending] = useState<{ activityId: string; change?: ScheduleChange } | null>(
     null,
@@ -93,10 +93,10 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   const run = useCommand(pub.id)
   const sandbox = useSandbox(pub.id)
   const tab = search.tab ?? 'table'
+  /** The tabs that show the plan itself, with the search and filter toolbar. */
+  const planTab = tab === 'table' || tab === 'gantt'
   const filter = search.filter ?? 'all'
   const filtering = Boolean(search.q || search.role || filter !== 'all')
-
-  useEffect(() => clearFlash, [clearFlash])
 
   // Undo/redo from the keyboard, unless typing in a field.
   useEffect(() => {
@@ -111,12 +111,12 @@ function PublicationView({ record }: { record: PublicationRecord }) {
         if (e.shiftKey && h?.redoable.length) s.redo(pub.id)
         else if (!e.shiftKey && h?.undoable.length) s.undo(pub.id)
       } catch (err) {
-        flash.show(err instanceof Error ? err.message : String(err))
+        showFlash(err instanceof Error ? err.message : String(err))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [pub.id, flash])
+  }, [pub.id, showFlash])
 
   const groups = useMemo(() => {
     const q = search.q?.toLowerCase()
@@ -173,16 +173,6 @@ function PublicationView({ record }: { record: PublicationRecord }) {
     <>
       <PublicationHeader record={record} health={health} />
 
-      {flash.message && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-status-late/40 bg-status-late/10 px-4 py-3 text-sm">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-late" />
-          <p className="flex-1">{flash.message}</p>
-          <button type="button" onClick={flash.clear} aria-label="Luk">
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-
       <nav className="mb-4 flex gap-1 border-b" aria-label="Visninger">
         {TABS.map((t) => (
           <Link
@@ -201,7 +191,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
         ))}
       </nav>
 
-      {tab !== 'history' && (
+      {planTab && (
         <div className="sticky top-0 z-40 -mx-4 mb-3 flex flex-wrap items-center gap-2 bg-background/90 px-4 py-2 backdrop-blur md:-mx-8 md:px-8">
           <div className="relative min-w-56 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -288,7 +278,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
         </div>
       )}
 
-      {tab !== 'history' && groups.length === 0 && (
+      {planTab && groups.length === 0 && (
         <p className="py-10 text-center text-sm text-muted-foreground">
           {da.publication.noMatches}
         </p>
@@ -344,6 +334,8 @@ function PublicationView({ record }: { record: PublicationRecord }) {
           />
         </>
       )}
+
+      {tab === 'funding' && <FundingView publication={pub} asOf={asOf} />}
 
       {tab === 'history' && <HistoryView record={record} asOf={asOf} />}
 

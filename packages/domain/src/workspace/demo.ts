@@ -5,6 +5,7 @@
 import { DEFAULT_CALENDAR, getCalendar } from '../calendar/calendar'
 import type { IsoDate } from '../model/common'
 import type { Person } from '../model/publication'
+import type { RoleId } from '../model/roles'
 import { SCENARIOS } from '../simulation/library'
 import { runScenario, type Scenario } from '../simulation/scenario'
 import type { PublicationRecord } from './workspace'
@@ -14,7 +15,15 @@ export const DEMO_PEOPLE: Person[] = [
   { id: 'demo-sofie', name: 'Sofie Lund', email: null, defaultRoles: ['project-lead'] },
   { id: 'demo-mikkel', name: 'Mikkel Brandt', email: null, defaultRoles: ['editor'] },
   { id: 'demo-jonas', name: 'Jonas Kjær', email: null, defaultRoles: ['designer'] },
+  { id: 'demo-ida', name: 'Ida Winther', email: null, defaultRoles: ['picture-editor'] },
 ]
+
+/** Who does what on every demo book, besides the project lead. */
+const DEMO_ROLES: Partial<Record<RoleId, string[]>> = {
+  editor: ['demo-mikkel'],
+  designer: ['demo-jonas'],
+  'picture-editor': ['demo-ida'],
+}
 
 const library = (id: string) => {
   const s = SCENARIOS.find((x) => x.id === id)
@@ -102,6 +111,7 @@ export function seedDemoWorkspace(options: {
       publicationId: book.id,
       workingTitle: book.title,
       projectLeadId: book.projectLeadId,
+      roleAssignments: { ...DEMO_ROLES, 'project-lead': [book.projectLeadId] },
     }),
   )
   return { people: DEMO_PEOPLE, publications }
@@ -122,6 +132,7 @@ export function scenarioBook(
     publicationId: string
     workingTitle: string
     projectLeadId?: string | null
+    roleAssignments?: Partial<Record<RoleId, string[]>>
   },
 ): PublicationRecord {
   const run = runScenario(scenario, {
@@ -132,6 +143,7 @@ export function scenarioBook(
     publicationId: options.publicationId,
     workingTitle: options.workingTitle,
     projectLeadId: options.projectLeadId ?? null,
+    ...(options.roleAssignments ? { roleAssignments: options.roleAssignments } : {}),
   })
   return { publication: run.publication, history: run.history, simulation: run.simulation }
 }

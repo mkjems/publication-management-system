@@ -16,7 +16,9 @@ import {
   type Publication,
   type WaitingFor,
 } from '../model/publication'
+import { isFundingSufficient } from '../engine/funding'
 import { topologicalOrder } from '../engine/graph'
+import type { RoleId } from '../model/roles'
 import {
   previewReschedule,
   shiftPlan,
@@ -178,6 +180,11 @@ export function setStatus(
       if (a.actualStart && a.actualStart > on) {
         throw new CommandError('An activity cannot finish before it started')
       }
+      if (a.gate === 'funding_secured' && !isFundingSufficient(pub)) {
+        throw new CommandError(
+          'The funding gate needs the minimum funding secured or the risk accepted',
+        )
+      }
       next = { ...a, status, actualFinish: on, waitingFor: null }
       break
     case 'skipped':
@@ -201,6 +208,93 @@ export function setStatus(
   if (status === 'done' && a.gate === 'funding_secured' && pub.planState === 'preliminary') {
     makeBindingStep(tx, a.name)
   }
+  return tx.result()
+}
+
+export type GateDecision = 'go' | 'hold' | 'no_go'
+
+/**
+ * The GO / HOLD / NO-GO decision (PLAN §5.1.6). GO completes the gate (and resumes the plan if
+ * it was on HOLD, shifting it by the length of the hold). HOLD pauses the publication with
+ * lifecycle "hold"; the gate stays open for a later decision. NO-GO stops the publication.
+ * One transaction, so one undo reverts the whole decision.
+ */
+export function decideGate(
+  pub: Publication,
+  activityId: string,
+  decision: GateDecision,
+  ctx: CommandContext,
+  meta: ChangeMeta = {},
+): CommandResult {
+  const a = findActivity(pub, activityId)
+  if (a.gate !== 'go_hold_nogo') throw new CommandError('Not a GO / HOLD / NO-GO gate')
+  if (a.status === 'done') throw new CommandError('The decision has already been made')
+  if (['released', 'closed', 'no_go'].includes(pub.lifecycle)) {
+    throw new CommandError(`A ${pub.lifecycle} publication cannot change its decision`)
+  }
+  if (decision !== 'go' && !meta.reason) throw new CommandError('HOLD and NO-GO need a reason')
+
+  const tx = new Transaction(ctx, pub)
+  const held = openPause(pub)
+  const payload = { activityId, decision }
+  switch (decision) {
+    case 'go':
+      if (held) {
+        tx.include(resume(tx.publication, ctx, { mode: { kind: 'shift' }, acceptConflicts: true }))
+      }
+      tx.record(
+        'gate_decided',
+        setStatus(tx.publication, activityId, 'done', ctx).publication,
+        payload,
+        meta,
+      )
+      break
+    case 'hold':
+      tx.record(
+        'gate_decided',
+        {
+          ...pub,
+          lifecycle: 'hold',
+          pauses: held
+            ? pub.pauses
+            : [...pub.pauses, { from: ctx.asOf, to: null, reason: meta.reason ?? '' }],
+        },
+        payload,
+        meta,
+      )
+      break
+    case 'no_go':
+      tx.record('gate_decided', { ...pub, lifecycle: 'no_go' }, payload, meta)
+      break
+  }
+  return tx.result()
+}
+
+/**
+ * Assigns people to a role on this publication (replacing the previous assignment). For the
+ * project lead role the first person also becomes the publication's project lead.
+ */
+export function assignRole(
+  pub: Publication,
+  roleId: RoleId,
+  personIds: string[],
+  ctx: CommandContext,
+): CommandResult {
+  const next = { ...pub.roleAssignments }
+  const unique = [...new Set(personIds)]
+  if (unique.length) next[roleId] = unique
+  else delete next[roleId]
+  const lead = roleId === 'project-lead' ? { projectLeadId: unique[0] ?? null } : {}
+  const tx = new Transaction(ctx, pub)
+  tx.record(
+    'roles_assigned',
+    { ...pub, ...lead, roleAssignments: next },
+    {
+      roleId,
+      from: pub.roleAssignments[roleId] ?? [],
+      to: unique,
+    },
+  )
   return tx.result()
 }
 

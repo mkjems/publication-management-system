@@ -1,5 +1,7 @@
 import {
   MASTERPLAN_V1,
+  ROLE_LABELS,
+  type RoleId,
   originalBaseline,
   type Activity,
   type ActivityStatus,
@@ -10,8 +12,14 @@ import {
   type Template,
   type TrackTemplate,
 } from '@pms/domain'
-import { EVENT_LABELS, STATUS_LABELS, da } from '@/i18n/da'
-import { formatDate } from './format'
+import {
+  EVENT_LABELS,
+  FUNDING_STATUS_LABELS,
+  GATE_DECISION_LABELS,
+  STATUS_LABELS,
+  da,
+} from '@/i18n/da'
+import { formatDate, formatMoney } from './format'
 
 const TEMPLATES: Template[] = [MASTERPLAN_V1]
 
@@ -118,6 +126,33 @@ export function describeEvent(e: ChangeEvent, pub: Publication): string {
       return `${name(p.activityId)} ← ${name((p.dependency as { activityId?: string } | undefined)?.activityId)}`
     case 'activity_updated':
       return name(p.activityId)
+    case 'funding_changed': {
+      if (p.op === 'target') {
+        return [
+          typeof p.minimumRequired === 'number' && `Minimum ${formatMoney(p.minimumRequired)}`,
+          typeof p.riskAccepted === 'boolean' &&
+            (p.riskAccepted ? 'risikoen godkendt' : 'risikoen ikke længere godkendt'),
+        ]
+          .filter(Boolean)
+          .join(', ')
+      }
+      const status = p.status as { from: string; to: string } | undefined
+      const label = (s: string) =>
+        FUNDING_STATUS_LABELS[s as keyof typeof FUNDING_STATUS_LABELS] ?? s
+      const what =
+        p.op === 'added'
+          ? 'tilføjet'
+          : p.op === 'removed'
+            ? 'fjernet'
+            : status
+              ? `${label(status.from)} → ${label(status.to)}`
+              : 'redigeret'
+      return `${String(p.funder ?? '')}: ${what}`
+    }
+    case 'gate_decided':
+      return `${name(p.activityId)}: ${GATE_DECISION_LABELS[p.decision as keyof typeof GATE_DECISION_LABELS] ?? String(p.decision)}`
+    case 'roles_assigned':
+      return ROLE_LABELS[p.roleId as RoleId] ?? String(p.roleId)
     case 'undone':
     case 'redone':
       return Array.isArray(p.types)

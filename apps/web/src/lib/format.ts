@@ -79,3 +79,14 @@ export function formatSigned(n: number): string {
 export function formatWorkdays(n: number): string {
   return `${n} ${Math.abs(n) === 1 ? 'arbejdsdag' : 'arbejdsdage'}`
 }
+
+const money = new Intl.NumberFormat('da-DK', {
+  style: 'currency',
+  currency: 'DKK',
+  maximumFractionDigits: 0,
+})
+
+/** "250.000 kr." */
+export function formatMoney(amount: number): string {
+  return money.format(amount)
+}

@@ -25,6 +25,9 @@ export const ChangeEventTypeSchema = z.enum([
   'dependency_added',
   'dependency_removed',
   'activity_updated',
+  'funding_changed',
+  'gate_decided',
+  'roles_assigned',
   'undone',
   'redone',
 ])

@@ -177,6 +177,13 @@ describe('scenarioBook', () => {
     })
     expect(book.publication).toMatchObject({ id: 'book', workingTitle: 'Havebogen' })
     expect(book.history.log.every((e) => e.effectiveDate <= '2026-11-26')).toBe(true)
-    expect(book.simulation!.script.map((e) => e.action.kind)).toEqual(['pause', 'resume'])
+    expect(
+      book.simulation!.script.map((e) => e.action.kind).filter((k) => k !== 'funding'),
+    ).toEqual(['pause', 'resume'])
+    expect(book.publication.funding.applications.map((a) => a.status)).toEqual([
+      'planned',
+      'planned',
+      'planned',
+    ])
   })
 })

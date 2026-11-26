@@ -113,12 +113,14 @@ function PublicationsPage() {
         </Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="py-2.5 pr-3 pl-5 font-medium">{da.publications.columns.title}</th>
                 <th className="px-3 py-2.5 font-medium">{da.publications.columns.release}</th>
                 <th className="px-3 py-2.5 font-medium">{da.publications.columns.forecast}</th>
+                <th className="px-3 py-2.5 font-medium">{da.publications.columns.slip}</th>
+                <th className="px-3 py-2.5 font-medium">{da.publications.columns.funding}</th>
                 <th className="w-36 px-3 py-2.5 font-medium">{da.publications.columns.progress}</th>
                 <th className="px-3 py-2.5 font-medium">{da.publications.columns.health}</th>
                 <th className="py-2.5 pr-5 pl-3 font-medium">{da.publications.columns.next}</th>

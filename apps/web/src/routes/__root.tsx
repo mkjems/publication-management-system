@@ -2,6 +2,7 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect } from 'react'
 import { AppSidebar, MobileNav } from '@/components/app-sidebar'
+import { FlashBanner } from '@/components/flash-banner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TimeMachine } from '@/components/workspace/time-machine'
 import { da } from '@/i18n/da'
@@ -47,6 +48,7 @@ function RootLayout() {
           </main>
         </div>
       </div>
+      <FlashBanner />
     </TooltipProvider>
   )
 }

@@ -310,7 +310,10 @@ describe('workspace store: scenario library', () => {
     })
     const r = store.getState().records[id]!
     expect(r.publication.workingTitle).toBe('Havebogen')
-    expect(r.simulation!.script.map((e) => e.action.kind)).toEqual(['pause', 'resume'])
+    expect(r.simulation!.script.map((e) => e.action.kind).filter((k) => k !== 'funding')).toEqual([
+      'pause',
+      'resume',
+    ])
 
     const real = setup('real')
     await real.store.getState().load()

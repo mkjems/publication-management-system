@@ -18,6 +18,7 @@ import {
   Save,
   Trash2,
   Undo2,
+  Users,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -42,6 +43,7 @@ import { formatDate } from '@/lib/format'
 import { useWorkspace } from '@/store'
 import { useFlash } from '@/store/flash'
 import { PlanDialog, type PlanDialogKind } from './plan-dialogs'
+import { RolesDialog } from './roles-dialog'
 import { ScenarioBanner } from './scenario-banner'
 
 export function PublicationHeader({
@@ -60,6 +62,7 @@ export function PublicationHeader({
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [dialog, setDialog] = useState<PlanDialogKind | null>(null)
+  const [rolesOpen, setRolesOpen] = useState(false)
   const openSandbox = useWorkspace((s) => s.openSandbox)
   const inSandbox = useSandbox(pub.id) !== null
   const { overall, release } = health
@@ -128,6 +131,10 @@ export function PublicationHeader({
                   {da.planActions.rebaseline}
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onSelect={() => setRolesOpen(true)}>
+                <Users />
+                {da.planActions.roles}
+              </DropdownMenuItem>
               {!inSandbox && (
                 <>
                   <DropdownMenuSeparator />
@@ -222,6 +229,7 @@ export function PublicationHeader({
       </div>
 
       {dialog && <PlanDialog kind={dialog} publication={pub} onClose={() => setDialog(null)} />}
+      {rolesOpen && <RolesDialog publication={pub} onClose={() => setRolesOpen(false)} />}
 
       <ConfirmDialog
         open={confirmDelete}

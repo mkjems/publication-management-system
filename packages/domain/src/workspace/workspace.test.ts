@@ -44,8 +44,9 @@ describe('seedDemoWorkspace', () => {
 
   it('keeps the scripted resume for the paused book, and plays it when time advances', () => {
     const hold = byId('demo-den-danske-have')
-    expect(hold.simulation!.script.map((e) => e.action.kind)).toEqual(['resume'])
-    const resumeOn = hold.simulation!.script[0]!.on
+    const story = hold.simulation!.script.filter((e) => e.action.kind !== 'funding')
+    expect(story.map((e) => e.action.kind)).toEqual(['resume'])
+    const resumeOn = story[0]!.on
     const later = advanceSimulation(
       { ...hold, simulation: hold.simulation! },
       {
@@ -56,7 +57,7 @@ describe('seedDemoWorkspace', () => {
       },
     )
     expect(later.publication.lifecycle).not.toBe('paused')
-    expect(later.simulation.script).toEqual([])
+    expect(later.simulation.script.every((e) => e.on > resumeOn)).toBe(true)
     expect(later.history.log.at(-1)!.effectiveDate <= resumeOn).toBe(true)
   })
 })

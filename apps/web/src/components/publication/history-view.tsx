@@ -25,6 +25,7 @@ const PLANNING: ReadonlySet<ChangeEventType> = new Set([
   'rebaselined',
   'paused',
   'resumed',
+  'gate_decided',
 ])
 
 function groupOf(e: ChangeEvent): Group {

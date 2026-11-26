@@ -19,7 +19,9 @@ dependencies.
 - Phase 3 is done: the interactive Gantt (`apps/web/src/components/gantt`).
 - Phase 4 is done: whole-plan dialogs, scenario mode (sandbox), history with the slip chart,
   scenario books in the demo.
-- Next: **Phase 5**, progress tracking and portfolio (PLAN §6).
+- Phase 5 is done: Oversigt (portfolio Gantt), Mine opgaver, funding tab and gate logic, role
+  assignments, stress simulation.
+- Next: **Phase 6**, template editor, polish and client validation (PLAN §6).
 
 ## Layout
 
@@ -29,14 +31,16 @@ apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes)
   store/          Zustand workspace store: all plan changes go through `execute(id, command)`;
                   in scenario mode they go to the sandbox copy (read records via `selectRecord`)
   lib/clock.ts    the only place that reads the system clock
-  components/     publication/ (table, panel, impact dialog), gantt/ (chart; scale.ts and rows.ts
-                  are pure and tested), workspace/ (Tidsmaskine), ui/
+  components/     publication/ (table, panel, dialogs, funding), gantt/ (chart; scale.ts and
+                  rows.ts are pure and tested), portfolio/ (portfolio Gantt), work/ (work lists),
+                  workspace/ (Tidsmaskine), ui/
 packages/domain   Framework-free TypeScript, no build step:
   calendar/       working-day calendar (Danish holidays, closures), date helpers
   model/          Zod schemas: template, publication, activity, events
   templates/      master plan data, builder DSL, validator
   engine/         generatePlan, analyzePlan (forecast/slack/critical path), previewReschedule,
-                  shiftPlan, assessHealth, comparePlans; constraints.ts defines FS/SS/FF
+                  shiftPlan, assessHealth, comparePlans, fundingStatus, workItems;
+                  constraints.ts defines FS/SS/FF
   commands/       commands → { publication, events }; diff-based undo/redo history;
                   previewCommand; timeline.ts rebuilds past plans from the log (slip chart)
   simulation/     seeded simulateProgress, scenarios and the scenario library

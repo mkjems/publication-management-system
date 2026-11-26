@@ -1,3 +1,5 @@
+import { constrainsStart, earliestFinish } from '../engine/constraints'
+import { topologicalOrder } from '../engine/graph'
 import { startOffset, type Template } from '../model/template'
 
 export interface TemplateIssue {
@@ -65,47 +67,26 @@ export function validateTemplate(t: Template): TemplateIssue[] {
     }
   }
 
-  // Cycle detection (Kahn's algorithm).
-  const indegree = new Map(t.activities.map((a) => [a.id, 0]))
-  const successors = new Map<string, string[]>(t.activities.map((a) => [a.id, []]))
-  for (const a of t.activities) {
-    for (const d of a.predecessors) {
-      if (!activities.has(d.activityId) || d.activityId === a.id) continue
-      indegree.set(a.id, (indegree.get(a.id) ?? 0) + 1)
-      successors.get(d.activityId)?.push(a.id)
-    }
-  }
-  const queue = [...indegree].filter(([, n]) => n === 0).map(([id]) => id)
-  let visited = 0
-  while (queue.length) {
-    const id = queue.shift()!
-    visited++
-    for (const s of successors.get(id) ?? []) {
-      const n = (indegree.get(s) ?? 0) - 1
-      indegree.set(s, n)
-      if (n === 0) queue.push(s)
-    }
-  }
-  if (visited < t.activities.length) {
-    const inCycle = [...indegree].filter(([, n]) => n > 0).map(([id]) => id)
-    err('cycle', `Dependency cycle involving: ${inCycle.join(', ')}`)
-  }
+  const topo = topologicalOrder(t.activities)
+  if (!topo.ok) err('cycle', `Dependency cycle: ${topo.cycle.join(' → ')}`)
 
   // Default offsets must respect the dependencies.
   for (const a of t.activities) {
     for (const d of a.predecessors) {
       const p = activities.get(d.activityId)
       if (!p) continue
-      const [lhs, rhs, label] =
-        d.type === 'FS'
-          ? [startOffset(a), p.deadlineOffset + d.lagWorkdays, 'start']
-          : d.type === 'SS'
-            ? [startOffset(a), startOffset(p) + d.lagWorkdays, 'start']
-            : [a.deadlineOffset, p.deadlineOffset + d.lagWorkdays, 'deadline']
-      if (lhs < rhs) {
+      const required = earliestFinish(
+        d,
+        { start: startOffset(p), finish: p.deadlineOffset },
+        a.durationWorkdays,
+      )
+      const short = required - a.deadlineOffset
+      if (short > 0) {
+        const label = constrainsStart(d) ? 'start' : 'deadline'
+        const actual = constrainsStart(d) ? startOffset(a) : a.deadlineOffset
         err(
           'dependency-violated',
-          `${d.type} from "${p.id}" violated: ${label} ${lhs} < ${rhs} (short by ${rhs - lhs} workdays)`,
+          `${d.type} from "${p.id}" violated: ${label} ${actual} < ${actual + short} (short by ${short} workdays)`,
           a.id,
         )
       }

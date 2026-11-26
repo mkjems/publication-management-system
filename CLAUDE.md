@@ -14,13 +14,22 @@ dependencies.
 
 - Stage A (current): frontend only, local state. Stage B (later): Postgres + API + auth.
 - Phase 0 is done: monorepo, tooling, app shell, master plan encoded as data, read-only Masterplan page.
-- Next: **Phase 1, the scheduling engine** in `packages/domain`, test-first.
+- Phase 1 is done: the scheduling engine in `packages/domain` (PLAN §4.2 lists the decisions).
+- Next: **Phase 2**, publications, `Clock` + Tidsmaskine, IndexedDB and the table view.
 
 ## Layout
 
 ```
 apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes), Tailwind v4, shadcn/ui
-packages/domain   Framework-free TypeScript: Zod schemas, master plan template, (next) scheduling engine
+packages/domain   Framework-free TypeScript, no build step:
+  calendar/       working-day calendar (Danish holidays, closures), date helpers
+  model/          Zod schemas: template, publication, activity, events
+  templates/      master plan data, builder DSL, validator
+  engine/         generatePlan, analyzePlan (forecast/slack/critical path), previewReschedule,
+                  shiftPlan, assessHealth; constraints.ts defines FS/SS/FF
+  commands/       commands → { publication, events }; diff-based undo/redo history
+  simulation/     seeded simulateProgress, scenarios and the scenario library
+  testing/        test fixtures (not exported)
 docs/             Plan and client-facing notes
 ```
 
@@ -45,8 +54,10 @@ pnpm format       # prettier --write
 - Dependency semantics (see `model/common.ts`): `start = deadline − duration`; FS means
   `succ.start ≥ pred.deadline + lag`. Keep the validator and the engine consistent with this.
 - Mutations go through commands that emit `ChangeEvent`s (undo/redo, audit, later API sync).
+  Commands take a `CommandContext` (`asOf`, `recordedAt`, `by`, `newId`); the domain never
+  generates ids or timestamps itself.
 - Never overwrite the baseline (_Oprindelig deadline_); changes go to the current deadline and are
-  logged.
+  logged. Baselines are numbered snapshots on the publication; baseline 0 is the original.
 - Code, identifiers and comments are in English. **UI text is Danish** and lives in
   `apps/web/src/i18n/da.ts`. Master plan content (activity names etc.) stays in Danish, as in the PDF.
 - `packages/domain/src/templates/masterplan-v1.ts` is hand-formatted (one line per activity) and

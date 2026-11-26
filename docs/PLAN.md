@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v2 · 2026-11-26 (adds §4.3 time and simulation)
+Status: draft v3 · 2026-11-26 (Phase 1 done; §3 and §4 updated to match the engine)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -97,28 +97,30 @@ Template (versioned)
  │                       optional: boolean }            // "Eventuelt register…", "Eventuel farveprøve…"
  └─ Role               { id, name }
 
-Publication
- { id, workingTitle, templateVersion,
+Publication (Stage A keeps activities, baselines and calendar inside the publication)
+ { id, workingTitle, templateId, templateVersion,
    projectLeadId,
-   desiredReleaseDate, bindingReleaseDate | null,
+   kickoffDate, desiredReleaseDate, bindingReleaseDate | null,
    planState: preliminary | binding,
    lifecycle: idea | go | hold | no_go | active | paused | released | closed,
    funding: { minimumRequired, secured, riskAccepted, applications[] },
    roleAssignments: { roleId → personId[] },
    pauses: [{ from, to | null, reason }],
-   calendarId }
+   calendar: { holidays: dk | dk-official | none, closures[] },
+   baselines: [{ number, capturedOn, reason, releaseDate,  // 0 = "Oprindelig deadline", captured when
+                 activities: { id → { start, deadline } } }],  // the plan becomes binding; never overwritten
+   activities: Activity[] }
 
 Activity (instance, copied from the template and then edited freely)
- { id, publicationId, templateActivityId | null,      // null = custom activity added by the user
-   phaseId, trackId, name, kind, roles[], assigneeIds[],
-   start | null,                                      // only for kind=task
-   baselineDeadline,                                  // "Oprindelig deadline", set when the plan becomes binding
-   currentDeadline,                                   // "Aktuel deadline"
+ { id, templateActivityId | null,                     // null = custom activity added by the user
+   phaseId, trackId, name, kind, responsible, assigneeIds[],
+   durationWorkdays, start | null,                    // start only for kind=task; first working day
+   deadline,                                          // "Aktuel deadline"
    actualStart | null, actualFinish | null,
    status: not_started | in_progress | waiting | done | skipped,
-   waitingFor?: { text, expectedDate },
+   waitingFor: { text, expectedDate | null } | null,
    pinned: boolean,                                   // fixed date: event venue, printer slot…
-   note, predecessors[] }
+   optional, gate | null, note, predecessors[] }
 
 FundingApplication { id, publicationId, funder, amount, status: planned|submitted|granted|rejected,
                      submittedAt, expectedDecisionAt, decidedAt, conditions }
@@ -126,7 +128,8 @@ FundingApplication { id, publicationId, funder, amount, status: planned|submitte
 Person { id, name, email, defaultRoles[] }
 
 ChangeEvent (append-only log: audit trail, undo/redo, analytics)
- { id, publicationId, effectiveDate, recordedAt, by, type, payload, reason?, reasonCategory? }
+ { id, txId, publicationId, effectiveDate, recordedAt, by, type, payload, reason?, reasonCategory?,
+   diff }                                             // field-level diff; undo applies it in reverse
    types: activity_rescheduled, status_changed, release_date_changed, plan_made_binding,
           paused, resumed, rebaselined, activity_added, dependency_changed, …
    reasonCategory: author, editorial, images_rights, design, printer, funding, external, other
@@ -134,6 +137,10 @@ ChangeEvent (append-only log: audit trail, undo/redo, analytics)
 
 **Dates** are stored as ISO `YYYY-MM-DD` strings with no time or timezone. All arithmetic goes
 through a working-day calendar module.
+
+**Baselines vs re-baselining.** "Never overwrite the original deadline" and "moving the release
+re-baselines" are both kept by storing baselines as numbered snapshots: baseline 0 is the
+_Oprindelig deadline_; a re-baseline adds baseline 1, 2, … Variance is measured against baseline 0.
 
 ---
 
@@ -189,6 +196,32 @@ and (in Stage B) the server all use the same logic.
   audit log and, later, API sync from one mechanism.
 - Tests: Vitest for unit tests, plus property-based tests (fast-check) for invariants such as "no
   successor starts before its predecessor finishes plus lag" and "pinned dates never move silently".
+
+Decisions made while building it (Phase 1):
+
+- **Working-day axis.** The engine computes on integer positions, one per working day
+  (`WorkCalendar.ordinal`), so dependency rules are plain arithmetic. `engine/constraints.ts` is
+  the single definition of FS/SS/FF, used by the template validator and the engine alike.
+- **Forecast never pulls work earlier** than its planned dates; it pushes later for late
+  predecessors, for work not started by `asOf`, for late starts and for waiting.
+- **Slack is measured against the release** for everything that leads to the release. Side tracks
+  (press, funding follow-up) and post-release work are measured against their own deadlines, so
+  they warn on their own without eating into the main chain's slack.
+- **Critical path** = walk back from the release milestone through the predecessor with least
+  slack. With the default network this reproduces the chain in `masterplan-defaults.md`.
+- **Rescheduling only moves what is downstream of the change.** Done and pinned activities never
+  move (pinned conflicts are reported and must be accepted explicitly). A task that has started
+  keeps its actual start; moving its deadline stretches it.
+- **Push** shifts downstream work before the release; the release only moves if it has to.
+  **Compress** shortens not-started tasks on the chain that drives the release, longest first,
+  down to 50% of their duration by default.
+- **Pause/resume** and **release date changes** shift remaining work (not overdue work, so
+  lateness stays visible), then repair dependencies; nothing that has not started may start
+  before the resume date.
+- **Health**: late > waiting > at_risk > on_track. At risk = forecast slip, negative slack (the
+  threshold is configurable), or a pinned conflict. Slip against baseline 0 is reported separately.
+- **Simulation** goes through the same commands as the user. Random draws depend only on
+  (seed, activity, day); the only carried state is each started task's expected finish.
 
 ### 4.3 Time and simulation
 
@@ -462,7 +495,17 @@ Decisions in Stage A that keep the backend a swap rather than a rewrite:
 Phase 0 is done (repo, tooling, app shell, master plan as data, defaults in
 [masterplan-defaults.md](masterplan-defaults.md)).
 
-1. Review [masterplan-defaults.md](masterplan-defaults.md) with the client; answer or park the open
-   questions in §8.
-2. Phase 1: build the scheduling engine test-first, with `asOf` everywhere and `simulateProgress`
-   (§4.3).
+Phase 1 is done: calendar, generation, CPM analysis, reschedule preview and strategies,
+pause/resume, binding plan and baselines, health, commands with undo/redo, simulation and a
+scenario library replayed as regression tests. The open questions in §8 are parked for now.
+
+Findings to bring to the client review:
+
+- The default network has about **25 working days of total float** on the release chain at
+  production start (the 10-day stock buffer plus small gaps along the chain). A 3-week author
+  delay is absorbed without moving the release.
+- While a publication is on HOLD, the release forecast only starts slipping once that float is
+  used up (about 5 weeks with the defaults).
+
+Next: Phase 2 (publications, `Clock` and Tidsmaskine, IndexedDB, table view), seeding the demo
+workspace from the scenario library.

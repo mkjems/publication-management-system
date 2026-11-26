@@ -17,14 +17,14 @@ function OverviewPage() {
         description="Status for alle udgivelser: hvad er forsinket, hvad er i risiko, og hvad skal ske i denne uge."
         actions={
           <Button asChild variant="outline">
-            <Link to="/masterplan">Se masterplanen</Link>
+            <Link to="/publications">Se alle udgivelser</Link>
           </Button>
         }
       />
       <ComingSoon
         icon={LayoutDashboard}
-        title="Ingen udgivelser endnu"
-        body="Porteføljeoverblikket med status, sundhed og næste milepæl for hver bog kommer i fase 5. Udgivelser kan oprettes fra masterplanen i fase 2."
+        title={da.comingSoon}
+        body="Porteføljeoverblikket med portefølje-Gantt, sundhed og ugens opgaver på tværs af bøger kommer i fase 5. Indtil da findes listen over udgivelser under Udgivelser."
       />
     </>
   )

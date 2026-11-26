@@ -20,15 +20,37 @@ export interface History {
 
 export const emptyHistory: History = { log: [], undoable: [], redoable: [] }
 
-/** Appends a command's events. A new change clears the redo stack. */
-export function record(history: History, events: readonly ChangeEvent[]): History {
+/**
+ * Appends a command's events. A new change clears the redo stack. With `undoable: false` (changes
+ * made by the simulation as time passes) the events are logged but the undo stack is cleared too,
+ * since earlier changes can no longer be undone safely.
+ */
+export function record(
+  history: History,
+  events: readonly ChangeEvent[],
+  options: { undoable?: boolean } = {},
+): History {
   if (!events.length) return history
+  if (options.undoable === false) {
+    return { log: [...history.log, ...events], undoable: [], redoable: [] }
+  }
   const txIds = [...new Set(events.map((e) => e.txId))]
   return {
     log: [...history.log, ...events],
     undoable: [...history.undoable, ...txIds],
     redoable: [],
   }
+}
+
+/** Events that changed, or are about, one activity. Oldest first. */
+export function activityEvents(history: History, activityId: string): ChangeEvent[] {
+  return history.log.filter(
+    (e) =>
+      e.payload.activityId === activityId ||
+      e.diff.activities.some((o) =>
+        o.op === 'update' ? o.id === activityId : (o.activity as { id?: string }).id === activityId,
+      ),
+  )
 }
 
 export interface HistoryResult extends CommandResult {

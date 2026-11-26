@@ -1,4 +1,4 @@
-import type { ActivityKind, Dependency } from '@pms/domain'
+import type { ActivityKind, Dependency, IsoDate } from '@pms/domain'
 
 const WORKDAYS_PER_WEEK = 5
 const nf = new Intl.NumberFormat('da-DK', { maximumFractionDigits: 1 })
@@ -34,4 +34,48 @@ export const KIND_LABELS: Record<ActivityKind, string> = {
   task: 'Opgave',
   deadline: 'Deadline',
   milestone: 'Milepæl',
+}
+
+const dateLong = new Intl.DateTimeFormat('da-DK', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+const dateCompact = new Intl.DateTimeFormat('da-DK', {
+  day: 'numeric',
+  month: 'short',
+  year: '2-digit',
+  timeZone: 'UTC',
+})
+const weekday = new Intl.DateTimeFormat('da-DK', { weekday: 'short', timeZone: 'UTC' })
+
+function utc(date: IsoDate) {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y!, m! - 1, d!))
+}
+
+/** "15. okt. 2027". */
+export function formatDate(date: IsoDate | null | undefined): string {
+  return date ? dateLong.format(utc(date)) : '–'
+}
+
+/** "15. okt. 27", for dense tables. */
+export function formatDateCompact(date: IsoDate | null | undefined): string {
+  return date ? dateCompact.format(utc(date)) : '–'
+}
+
+/** "tor. 15. okt. 2027". */
+export function formatDateWithWeekday(date: IsoDate): string {
+  return `${weekday.format(utc(date))} ${formatDate(date)}`
+}
+
+/** "+3", "−2", "0": a signed number of working days. */
+export function formatSigned(n: number): string {
+  return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0'
+}
+
+/** "3 arbejdsdage", "1 arbejdsdag". */
+export function formatWorkdays(n: number): string {
+  return `${n} ${Math.abs(n) === 1 ? 'arbejdsdag' : 'arbejdsdage'}`
 }

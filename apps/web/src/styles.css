@@ -38,6 +38,7 @@
   --status-done: oklch(0.6 0.12 155);
   --status-active: oklch(0.55 0.13 255);
   --status-waiting: oklch(0.75 0.14 75);
+  --status-risk: oklch(0.68 0.16 45);
   --status-late: var(--destructive);
 
   /* Gantt */
@@ -102,6 +103,7 @@
   --color-status-done: var(--status-done);
   --color-status-active: var(--status-active);
   --color-status-waiting: var(--status-waiting);
+  --color-status-risk: var(--status-risk);
   --color-status-late: var(--status-late);
   --color-milestone: var(--milestone);
   --color-bar-task: var(--bar-task);

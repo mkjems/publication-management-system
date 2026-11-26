@@ -88,75 +88,171 @@ export interface ScenarioRunOptions {
   newId?: () => string
   publicationId?: string
   workingTitle?: string
+  projectLeadId?: string | null
 }
 
-export interface ScenarioRun {
+/** A scripted action with absolute dates, ready to run. */
+export type ScriptAction =
+  | Exclude<ScenarioAction, { kind: 'resume' } | { kind: 'change_release' }>
+  | { kind: 'resume'; mode: ResumeMode }
+  | { kind: 'change_release'; releaseDate: IsoDate; reason: string }
+
+/** Everything needed to keep playing a book forward in time. */
+export interface SimulationSetup {
+  policy: SimulationPolicy
+  seed: number
+  replan: boolean
+  /** Scripted events that have not happened yet. */
+  script: { on: IsoDate; action: ScriptAction }[]
+  state: SimulationState
+}
+
+export interface SimulatedBook {
   publication: Publication
   history: History
+  simulation: SimulationSetup
+}
+
+export interface ScenarioRun extends SimulatedBook {
   snapshots: ScenarioSnapshot[]
-  state: SimulationState
 }
 
 export function runScenario(scenario: Scenario, options: ScenarioRunOptions): ScenarioRun {
   let n = 0
   const newId = options.newId ?? (() => `${scenario.id}-${++n}`)
-  const { publication: initial } = generatePlan({
+  const { publication } = generatePlan({
     id: options.publicationId ?? scenario.id,
     workingTitle: options.workingTitle ?? scenario.name,
     template: options.template ?? MASTERPLAN_V1,
     desiredReleaseDate: options.releaseDate,
+    projectLeadId: options.projectLeadId ?? null,
     ...(scenario.skipOptional ? { skipOptional: scenario.skipOptional } : {}),
   })
-  const cal = getCalendar(initial.calendar)
-  const kickoff = initial.kickoffDate
+  const cal = getCalendar(publication.calendar)
   const resolve = (r: RelativeDate): IsoDate =>
-    cal.addWorkdays(r.from === 'kickoff' ? kickoff : options.releaseDate, r.workdays)
+    cal.addWorkdays(
+      r.from === 'kickoff' ? publication.kickoffDate : options.releaseDate,
+      r.workdays,
+    )
   const until = options.until ?? cal.addWorkdays(options.releaseDate, 70)
   const every = options.snapshotEveryWorkdays ?? 5
 
-  const script = scenario.events.map((e) => ({ on: resolve(e.at), action: e.action }))
-  let pub = initial
-  let history = emptyHistory
-  let state: SimulationState = {}
-  const snapshots: ScenarioSnapshot[] = []
-  const apply = (r: CommandResult) => {
-    pub = r.publication
-    history = record(history, r.events)
-  }
-
-  let workday = 0
-  for (let d = kickoff; d <= until; d = addDays(d, 1)) {
-    if (!cal.isWorkingDay(d)) continue
-    const ctx: CommandContext = { asOf: d, recordedAt: options.recordedAt, by: 'scenario', newId }
-    for (const e of script.filter((x) => x.on === d)) apply(runAction(pub, e.action, ctx, resolve))
-
-    const r = simulateProgress(pub, {
-      from: d,
-      to: d,
+  const start: SimulatedBook = {
+    publication,
+    history: emptyHistory,
+    simulation: {
       policy: scenario.policy,
       seed: scenario.seed,
       replan: scenario.replan ?? true,
+      script: scenario.events.map((e) => ({
+        on: resolve(e.at),
+        action: resolveAction(e.action, resolve),
+      })),
+      state: {},
+    },
+  }
+  const snapshots: ScenarioSnapshot[] = []
+  let workday = 0
+  const lastDay = cal.previousWorkingDay(until)
+  const book = advanceSimulation(start, {
+    from: publication.kickoffDate,
+    to: until,
+    recordedAt: options.recordedAt,
+    newId,
+    by: 'scenario',
+    onDay: (pub, d) => {
+      if (workday % every === 0 || d === lastDay) snapshots.push(snapshot(pub, d))
+      workday++
+    },
+  })
+  return { ...book, snapshots }
+}
+
+function resolveAction(
+  action: ScenarioAction,
+  resolve: (r: RelativeDate) => IsoDate,
+): ScriptAction {
+  switch (action.kind) {
+    case 'resume':
+      return {
+        kind: 'resume',
+        mode:
+          action.mode.kind === 'shift'
+            ? { kind: 'shift' }
+            : { kind: 'new_release', releaseDate: resolve(action.mode.release) },
+      }
+    case 'change_release':
+      return { kind: 'change_release', releaseDate: resolve(action.release), reason: action.reason }
+    default:
+      return action
+  }
+}
+
+export interface AdvanceOptions {
+  /** First and last day to play, inclusive. */
+  from: IsoDate
+  to: IsoDate
+  recordedAt: string
+  newId: () => string
+  /** Author of scripted and simulated changes. Default "simulation". */
+  by?: string
+  /** Called after each working day has been played. */
+  onDay?: (publication: Publication, date: IsoDate) => void
+}
+
+/**
+ * Plays a book forward day by day: scripted events first, then simulated progress. Simulated
+ * changes are logged but not undoable (time has moved on).
+ */
+export function advanceSimulation(book: SimulatedBook, options: AdvanceOptions): SimulatedBook {
+  const cal = getCalendar(book.publication.calendar)
+  const by = options.by ?? 'simulation'
+  let pub = book.publication
+  let history = book.history
+  let state = book.simulation.state
+  const apply = (r: CommandResult) => {
+    pub = r.publication
+    history = record(history, r.events, { undoable: false })
+  }
+
+  for (let d = options.from; d <= options.to; d = addDays(d, 1)) {
+    if (!cal.isWorkingDay(d)) continue
+    const ctx: CommandContext = {
+      asOf: d,
       recordedAt: options.recordedAt,
-      newId,
+      by,
+      newId: options.newId,
+    }
+    for (const e of book.simulation.script) {
+      if (e.on === d) apply(runAction(pub, e.action, ctx))
+    }
+    const r = simulateProgress(pub, {
+      from: d,
+      to: d,
+      policy: book.simulation.policy,
+      seed: book.simulation.seed,
+      replan: book.simulation.replan,
+      recordedAt: options.recordedAt,
+      newId: options.newId,
+      by,
       state,
     })
     apply(r)
     state = r.state
-
-    if (workday % every === 0 || d === cal.previousWorkingDay(until)) {
-      snapshots.push(snapshot(pub, d))
-    }
-    workday++
+    options.onDay?.(pub, d)
   }
-  return { publication: pub, history, snapshots, state }
+  return {
+    publication: pub,
+    history,
+    simulation: {
+      ...book.simulation,
+      script: book.simulation.script.filter((e) => e.on > options.to),
+      state,
+    },
+  }
 }
 
-function runAction(
-  pub: Publication,
-  action: ScenarioAction,
-  ctx: CommandContext,
-  resolve: (r: RelativeDate) => IsoDate,
-): CommandResult {
+function runAction(pub: Publication, action: ScriptAction, ctx: CommandContext): CommandResult {
   switch (action.kind) {
     case 'reschedule':
       return reschedule(pub, action.change, action.options, ctx, {
@@ -173,15 +269,10 @@ function runAction(
         reason: action.reason,
         ...(action.reasonCategory ? { reasonCategory: action.reasonCategory } : {}),
       })
-    case 'resume': {
-      const mode: ResumeMode =
-        action.mode.kind === 'shift'
-          ? { kind: 'shift' }
-          : { kind: 'new_release', releaseDate: resolve(action.mode.release) }
-      return resume(pub, ctx, { mode, acceptConflicts: true })
-    }
+    case 'resume':
+      return resume(pub, ctx, { mode: action.mode, acceptConflicts: true })
     case 'change_release':
-      return changeReleaseDate(pub, resolve(action.release), ctx, {
+      return changeReleaseDate(pub, action.releaseDate, ctx, {
         reason: action.reason,
         acceptConflicts: true,
       })

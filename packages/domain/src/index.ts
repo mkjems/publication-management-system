@@ -42,3 +42,7 @@ export { DiffConflictError, applyDiff, diffPublication, invertDiff } from './com
 export * from './simulation/simulate'
 export * from './simulation/scenario'
 export { SCENARIOS } from './simulation/library'
+
+// Workspace
+export * from './workspace/workspace'
+export { seedDemoWorkspace, DEMO_BOOKS, DEMO_PEOPLE, type DemoWorkspace } from './workspace/demo'

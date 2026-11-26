@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v3 · 2026-11-26 (Phase 1 done; §3 and §4 updated to match the engine)
+Status: draft v4 · 2026-11-26 (Phases 1–2 done; see §9 for findings)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -400,6 +400,20 @@ L ≈ 2–3 weeks).
 - JSON export/import.
 - _Demo:_ create a book, see its full plan as a table, update statuses.
 
+Decisions made while building it:
+
+- **No TanStack Table.** The plan table is grouped Phase → Track with inline editors; a hand-written
+  table (like the Masterplan page) was simpler. Revisit if sorting/column features are needed.
+- **The demo workspace always has a simulated date.** Forward in time plays every demo book on
+  (scripted events + simulation, including books the user creates there). Backward rebuilds the
+  demo data as of that date from the scenario library; the user is asked first if they changed
+  anything. Simulated changes are logged but clear the undo stack (time has moved on).
+- **The impact preview is already in the table**: changing _Aktuel deadline_ opens a dialog with
+  the four strategies, release effect, moved activities, pinned conflicts and a reason. Phase 4
+  builds on it (Gantt drag, pause/resume UI, scenario mode).
+- People are created on the fly in the wizard (project lead). Role → person assignments are not
+  in the UI yet.
+
 ### Phase 3: Interactive Gantt (L)
 
 - Timeline scale and zoom, grouped and collapsible rows, bars, ticks, milestones, today and release
@@ -507,5 +521,17 @@ Findings to bring to the client review:
 - While a publication is on HOLD, the release forecast only starts slipping once that float is
   used up (about 5 weeks with the defaults).
 
-Next: Phase 2 (publications, `Clock` and Tidsmaskine, IndexedDB, table view), seeding the demo
-workspace from the scenario library.
+Phase 2 is done: IndexedDB workspaces (real and demo), the Tidsmaskine, portfolio list, new
+publication wizard, plan table with inline status/notes, impact dialog, activity side panel,
+history tab and JSON export/import.
+
+Found while testing Phase 2:
+
+- **Compression picks unrealistic tasks.** It shortens the longest task on the critical chain,
+  which is often _Tryk og indbinding_ (12 → 6 days). Printing, transport and similar supplier
+  lead times cannot be compressed. Proposal: a `compressible` flag in the template (default true,
+  false for printer/warehouse work), to be confirmed with the client.
+- During a HOLD, overdue activities show as "Forsinket". That is accurate, but the portfolio may
+  want to show "På pause" as the health of a paused book instead (Phase 5).
+
+Next: Phase 3, the interactive Gantt.

@@ -15,12 +15,17 @@ dependencies.
 - Stage A (current): frontend only, local state. Stage B (later): Postgres + API + auth.
 - Phase 0 is done: monorepo, tooling, app shell, master plan encoded as data, read-only Masterplan page.
 - Phase 1 is done: the scheduling engine in `packages/domain` (PLAN §4.2 lists the decisions).
-- Next: **Phase 2**, publications, `Clock` + Tidsmaskine, IndexedDB and the table view.
+- Phase 2 is done: workspaces, Tidsmaskine, portfolio list, wizard, plan table, side panel.
+- Next: **Phase 3**, the interactive Gantt.
 
 ## Layout
 
 ```
 apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes), Tailwind v4, shadcn/ui
+  data/           WorkspaceRepository: IndexedDB (one database per workspace) and in-memory
+  store/          Zustand workspace store: all plan changes go through `execute(id, command)`
+  lib/clock.ts    the only place that reads the system clock
+  components/     publication/ (table, panel, impact dialog), workspace/ (Tidsmaskine), ui/
 packages/domain   Framework-free TypeScript, no build step:
   calendar/       working-day calendar (Danish holidays, closures), date helpers
   model/          Zod schemas: template, publication, activity, events
@@ -66,3 +71,7 @@ pnpm format       # prettier --write
   hangs on an interactive prompt here). Use the design tokens in `src/styles.css` (status colors,
   `milestone`, `bar-*`, `phase-band`) rather than raw colors.
 - TypeScript is pinned to 6.0.x: typescript-eslint does not support 7 yet.
+- Two workspaces: **real** (real clock, no simulation) and **demo** (simulated date, seeded from
+  the scenario library). Never let simulation touch the real workspace.
+- After adding or renaming a route file, run `pnpm --filter @pms/web build` (or `pnpm dev`) to
+  regenerate `routeTree.gen.ts` before typechecking.

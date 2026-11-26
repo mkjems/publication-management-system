@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { BookOpen, LayoutDashboard, ListChecks, Map } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { da } from '@/i18n/da'
+import { WorkspaceSwitcher } from './workspace/workspace-switcher'
 
 interface NavItem {
   to: '/' | '/publications' | '/my-work' | '/masterplan'
@@ -39,7 +40,9 @@ export function AppSidebar() {
           </Link>
         ))}
       </nav>
-      <div className="mt-auto px-5 py-4 text-xs text-muted-foreground">Prototype · lokale data</div>
+      <div className="mt-auto px-5 py-4">
+        <WorkspaceSwitcher />
+      </div>
     </aside>
   )
 }
@@ -58,6 +61,9 @@ export function MobileNav() {
           {label}
         </Link>
       ))}
+      <div className="ml-auto shrink-0">
+        <WorkspaceSwitcher compact />
+      </div>
     </nav>
   )
 }

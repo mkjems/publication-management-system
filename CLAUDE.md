@@ -16,7 +16,8 @@ dependencies.
 - Phase 0 is done: monorepo, tooling, app shell, master plan encoded as data, read-only Masterplan page.
 - Phase 1 is done: the scheduling engine in `packages/domain` (PLAN §4.2 lists the decisions).
 - Phase 2 is done: workspaces, Tidsmaskine, portfolio list, wizard, plan table, side panel.
-- Next: **Phase 3**, the interactive Gantt.
+- Phase 3 is done: the interactive Gantt (`apps/web/src/components/gantt`).
+- Next: **Phase 4**, delays and replanning (PLAN §6).
 
 ## Layout
 
@@ -25,7 +26,8 @@ apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes)
   data/           WorkspaceRepository: IndexedDB (one database per workspace) and in-memory
   store/          Zustand workspace store: all plan changes go through `execute(id, command)`
   lib/clock.ts    the only place that reads the system clock
-  components/     publication/ (table, panel, impact dialog), workspace/ (Tidsmaskine), ui/
+  components/     publication/ (table, panel, impact dialog), gantt/ (chart; scale.ts and rows.ts
+                  are pure and tested), workspace/ (Tidsmaskine), ui/
 packages/domain   Framework-free TypeScript, no build step:
   calendar/       working-day calendar (Danish holidays, closures), date helpers
   model/          Zod schemas: template, publication, activity, events

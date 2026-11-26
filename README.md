@@ -12,9 +12,9 @@ postponements.
 
 Stage A prototype: frontend only, data stored in the browser.
 
-- Phase 0 (foundations), Phase 1 (scheduling engine) and Phase 2 (publications, table view,
-  time machine) are done.
-- Next: Phase 3, the interactive Gantt chart.
+- Phase 0 (foundations), Phase 1 (scheduling engine), Phase 2 (publications, table view, time
+  machine) and Phase 3 (interactive Gantt) are done.
+- Next: Phase 4, delays and replanning.
 
 ## Getting started
 
@@ -36,6 +36,10 @@ The UI is in Danish.
   moves and what happens to the release, with four ways to handle the delay. Clicking an
   activity opens a side panel with dates, buffer, dependencies and history. Undo/redo works with
   the buttons or ⌘Z / ⇧⌘Z.
+- The **Gantt** tab shows the same plan as a chart. Drag a bar to move it, drag its right edge to
+  change the duration, or drag from the dot at its end to another activity to add a dependency.
+  While dragging, dashed ghosts show everything that would move. Nothing changes until you
+  confirm in the dialog that opens on release. The keyboard works too (Tab, ← →, Enter, Esc).
 - **Masterplan** shows the template itself, read-only.
 
 ### Two datasets

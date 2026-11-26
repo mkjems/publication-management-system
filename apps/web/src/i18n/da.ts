@@ -125,7 +125,6 @@ export const da = {
     notFound: 'Udgivelsen findes ikke',
     back: 'Alle udgivelser',
     tabs: { table: 'Tabel', gantt: 'Gantt', history: 'Historik' },
-    ganttSoon: 'Gantt-diagrammet med træk-og-slip og live konsekvensvisning kommer i fase 3.',
     target: 'Udgivelsesdato',
     desired: 'ønsket',
     binding: 'bindende',
@@ -166,6 +165,30 @@ export const da = {
     notePlaceholder: 'Tilføj bemærkning…',
   },
 
+  gantt: {
+    today: 'I dag',
+    release: 'Udgivelse',
+    pause: 'Pause',
+    deadline: 'deadline',
+    baseline: 'Oprindelig plan',
+    linkHint: 'Træk til en anden aktivitet for at tilføje en afhængighed',
+    zoom: { week: 'Uge', month: 'Måned', quarter: 'Kvartal' },
+    zoomLabel: 'Zoom',
+    critical: 'Kritisk vej',
+    allDependencies: 'Alle afhængigheder',
+    help: 'Træk en bjælke for at flytte den, træk i højre kant for at ændre varighed, og træk fra prikken for enden til en anden aktivitet for at tilføje en afhængighed. Med tastaturet: vælg med Tab, flyt med ← → (Shift: en uge), bekræft med Enter, fortryd med Esc.',
+    legend: {
+      task: 'Opgave',
+      deadline: 'Deadline',
+      milestone: 'Milepæl',
+      baseline: 'Oprindelig plan',
+      forecast: 'Prognose',
+      slack: 'Buffer',
+      preliminary: 'Foreløbig plan',
+    },
+    dependencyAdded: (from: string, to: string) => `"${to}" afhænger nu af "${from}"`,
+  },
+
   waiting: {
     title: 'Hvad venter aktiviteten på?',
     text: 'Venter på',
@@ -177,6 +200,9 @@ export const da = {
 
   impact: {
     title: 'Flyt deadline',
+    titleDuration: 'Ændr varighed',
+    newDuration: 'Ny varighed',
+    workdays: 'arbejdsdage',
     description: (name: string) => `Hvad sker der, hvis "${name}" flyttes?`,
     newDeadline: 'Ny deadline',
     strategy: 'Sådan håndteres forsinkelsen',

@@ -1,8 +1,17 @@
-import { ROLE_IDS, ROLE_LABELS, type PublicationRecord, type RoleId } from '@pms/domain'
+import {
+  ROLE_IDS,
+  ROLE_LABELS,
+  addDependency,
+  type PublicationRecord,
+  type RoleId,
+  type ScheduleChange,
+} from '@pms/domain'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ChevronsDownUp, ChevronsUpDown, GanttChart, Search, TriangleAlert, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { ComingSoon } from '@/components/coming-soon'
+import { ChevronsDownUp, ChevronsUpDown, Search, TriangleAlert, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Gantt } from '@/components/gantt/gantt'
+import { GanttLegend } from '@/components/gantt/legend'
+import { ZOOMS, type Zoom } from '@/components/gantt/scale'
 import { ActivityPanel } from '@/components/publication/activity-panel'
 import { HistoryList } from '@/components/publication/history-list'
 import { ImpactDialog } from '@/components/publication/impact-dialog'
@@ -11,6 +20,7 @@ import { PublicationHeader } from '@/components/publication/publication-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
+import { useCommand } from '@/hooks/use-command'
 import { useHealth, usePublicationRecord } from '@/hooks/use-publication'
 import { da } from '@/i18n/da'
 import { groupActivities } from '@/lib/publication'
@@ -29,6 +39,9 @@ interface PublicationSearch {
   q?: string
   filter?: Filter
   role?: RoleId
+  zoom?: Zoom
+  critical?: boolean
+  deps?: boolean
 }
 
 const oneOf = <T extends string>(values: readonly T[], v: unknown): v is T =>
@@ -41,6 +54,9 @@ export const Route = createFileRoute('/publications/$publicationId')({
     ...(typeof s.q === 'string' && s.q ? { q: s.q } : {}),
     ...(oneOf(FILTERS, s.filter) && s.filter !== 'all' ? { filter: s.filter } : {}),
     ...(oneOf(ROLE_IDS, s.role) ? { role: s.role } : {}),
+    ...(oneOf(ZOOMS, s.zoom) && s.zoom !== 'month' ? { zoom: s.zoom } : {}),
+    ...(s.critical === true || s.critical === 'true' ? { critical: true } : {}),
+    ...(s.deps === true || s.deps === 'true' ? { deps: true } : {}),
   }),
   component: PublicationPage,
 })
@@ -70,7 +86,10 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   const flash = useFlash()
   const clearFlash = useFlash((s) => s.clear)
   const [toggled, setToggled] = useState<Set<string>>(() => new Set())
-  const [moving, setMoving] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ activityId: string; change?: ScheduleChange } | null>(
+    null,
+  )
+  const run = useCommand(pub.id)
   const tab = search.tab ?? 'table'
   const filter = search.filter ?? 'all'
   const filtering = Boolean(search.q || search.role || filter !== 'all')
@@ -116,11 +135,17 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   )
 
   // Phases with open work start expanded; finished phases start collapsed.
-  const defaultOpen = (phaseId: string) => {
-    const s = health.phases.get(phaseId)?.state
-    return s !== 'done' && s !== 'skipped'
-  }
-  const isOpen = (phaseId: string) => filtering || defaultOpen(phaseId) !== toggled.has(phaseId)
+  const defaultOpen = useCallback(
+    (phaseId: string) => {
+      const s = health.phases.get(phaseId)?.state
+      return s !== 'done' && s !== 'skipped'
+    },
+    [health],
+  )
+  const isOpen = useCallback(
+    (phaseId: string) => filtering || defaultOpen(phaseId) !== toggled.has(phaseId),
+    [filtering, defaultOpen, toggled],
+  )
   const toggle = (phaseId: string) =>
     setToggled((t) => {
       const next = new Set(t)
@@ -137,7 +162,10 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   const setSearch = (patch: Partial<PublicationSearch>) =>
     void navigate({ search: (s) => ({ ...s, ...patch }), replace: true })
   const openActivity = (id: string) => setSearch({ activity: id })
-  const movingActivity = moving ? pub.activities.find((a) => a.id === moving) : undefined
+  const move = (activityId: string) => setPending({ activityId })
+  const pendingActivity = pending
+    ? pub.activities.find((a) => a.id === pending.activityId)
+    : undefined
 
   return (
     <>
@@ -171,75 +199,139 @@ function PublicationView({ record }: { record: PublicationRecord }) {
         ))}
       </nav>
 
-      {tab === 'table' && (
-        <>
-          <div className="sticky top-0 z-10 -mx-4 mb-3 flex flex-wrap items-center gap-2 bg-background/90 px-4 py-2 backdrop-blur md:-mx-8 md:px-8">
-            <div className="relative min-w-56 flex-1">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search.q ?? ''}
-                onChange={(e) => setSearch({ q: e.target.value || undefined })}
-                placeholder={da.publication.search}
-                aria-label={da.publication.search}
-                className="pl-9"
+      {tab !== 'history' && (
+        <div className="sticky top-0 z-40 -mx-4 mb-3 flex flex-wrap items-center gap-2 bg-background/90 px-4 py-2 backdrop-blur md:-mx-8 md:px-8">
+          <div className="relative min-w-56 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search.q ?? ''}
+              onChange={(e) => setSearch({ q: e.target.value || undefined })}
+              placeholder={da.publication.search}
+              aria-label={da.publication.search}
+              className="pl-9"
+            />
+          </div>
+          <NativeSelect
+            value={filter}
+            onChange={(e) =>
+              setSearch({
+                filter: e.target.value === 'all' ? undefined : (e.target.value as Filter),
+              })
+            }
+            aria-label={da.publication.filter.all}
+          >
+            {FILTERS.map((f) => (
+              <option key={f} value={f}>
+                {da.publication.filter[f]}
+              </option>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            value={search.role ?? ''}
+            onChange={(e) =>
+              setSearch({ role: (e.target.value || undefined) as RoleId | undefined })
+            }
+            aria-label={da.publication.allRoles}
+          >
+            <option value="">{da.publication.allRoles}</option>
+            {usedRoles.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </option>
+            ))}
+          </NativeSelect>
+          {!filtering && (
+            <Button variant="outline" onClick={() => setAll(!allOpen)}>
+              {allOpen ? <ChevronsDownUp /> : <ChevronsUpDown />}
+              {allOpen ? da.publication.collapseAll : da.publication.expandAll}
+            </Button>
+          )}
+          {tab === 'gantt' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                role="radiogroup"
+                aria-label={da.gantt.zoomLabel}
+                className="flex rounded-md border bg-card p-0.5 text-sm"
+              >
+                {ZOOMS.map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    role="radio"
+                    aria-checked={(search.zoom ?? 'month') === z}
+                    onClick={() => setSearch({ zoom: z === 'month' ? undefined : z })}
+                    className={cn(
+                      'rounded px-2.5 py-1',
+                      (search.zoom ?? 'month') === z
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {da.gantt.zoom[z]}
+                  </button>
+                ))}
+              </div>
+              <Toggle
+                checked={Boolean(search.critical)}
+                onChange={(v) => setSearch({ critical: v || undefined })}
+                label={da.gantt.critical}
+              />
+              <Toggle
+                checked={Boolean(search.deps)}
+                onChange={(v) => setSearch({ deps: v || undefined })}
+                label={da.gantt.allDependencies}
               />
             </div>
-            <NativeSelect
-              value={filter}
-              onChange={(e) =>
-                setSearch({
-                  filter: e.target.value === 'all' ? undefined : (e.target.value as Filter),
-                })
-              }
-              aria-label={da.publication.filter.all}
-            >
-              {FILTERS.map((f) => (
-                <option key={f} value={f}>
-                  {da.publication.filter[f]}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              value={search.role ?? ''}
-              onChange={(e) =>
-                setSearch({ role: (e.target.value || undefined) as RoleId | undefined })
-              }
-              aria-label={da.publication.allRoles}
-            >
-              <option value="">{da.publication.allRoles}</option>
-              {usedRoles.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r]}
-                </option>
-              ))}
-            </NativeSelect>
-            {!filtering && (
-              <Button variant="outline" onClick={() => setAll(!allOpen)}>
-                {allOpen ? <ChevronsDownUp /> : <ChevronsUpDown />}
-                {allOpen ? da.publication.collapseAll : da.publication.expandAll}
-              </Button>
-            )}
-          </div>
-          {groups.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {da.publication.noMatches}
-            </p>
-          ) : (
-            <PlanTable
-              publication={pub}
-              health={health}
-              groups={groups}
-              isOpen={isOpen}
-              onToggle={toggle}
-              onOpenActivity={openActivity}
-              onMove={setMoving}
-            />
           )}
-        </>
+        </div>
       )}
 
-      {tab === 'gantt' && (
-        <ComingSoon icon={GanttChart} title={da.comingSoon} body={da.publication.ganttSoon} />
+      {tab !== 'history' && groups.length === 0 && (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          {da.publication.noMatches}
+        </p>
+      )}
+
+      {tab === 'table' && groups.length > 0 && (
+        <PlanTable
+          publication={pub}
+          health={health}
+          groups={groups}
+          isOpen={isOpen}
+          onToggle={toggle}
+          onOpenActivity={openActivity}
+          onMove={move}
+        />
+      )}
+
+      {tab === 'gantt' && groups.length > 0 && (
+        <>
+          <Gantt
+            publication={pub}
+            health={health}
+            asOf={asOf}
+            groups={groups}
+            isOpen={isOpen}
+            onToggle={toggle}
+            zoom={search.zoom ?? 'month'}
+            showCritical={Boolean(search.critical)}
+            showAllDependencies={Boolean(search.deps)}
+            selectedId={search.activity ?? null}
+            onOpenActivity={openActivity}
+            onRequestChange={(change) => setPending({ activityId: change.activityId, change })}
+            onAddDependency={(predecessorId, successorId) =>
+              run((p, c) =>
+                addDependency(
+                  p,
+                  successorId,
+                  { activityId: predecessorId, type: 'FS', lagWorkdays: 0 },
+                  c,
+                ),
+              )
+            }
+          />
+          <GanttLegend preliminary={pub.planState === 'preliminary'} />
+        </>
       )}
 
       {tab === 'history' && <HistoryList record={record} />}
@@ -251,18 +343,41 @@ function PublicationView({ record }: { record: PublicationRecord }) {
           activityId={search.activity}
           onClose={() => setSearch({ activity: undefined })}
           onOpenActivity={openActivity}
-          onMove={setMoving}
+          onMove={move}
         />
       )}
 
-      {movingActivity && (
+      {pendingActivity && (
         <ImpactDialog
-          key={movingActivity.id}
+          key={`${pendingActivity.id}-${JSON.stringify(pending?.change ?? null)}`}
           publication={pub}
-          activity={movingActivity}
-          onOpenChange={(open) => !open && setMoving(null)}
+          activity={pendingActivity}
+          {...(pending?.change ? { initial: pending.change } : {})}
+          onOpenChange={(open) => !open && setPending(null)}
         />
       )}
     </>
+  )
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+}) {
+  return (
+    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border bg-card px-3 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="accent-primary"
+      />
+      {label}
+    </label>
   )
 }

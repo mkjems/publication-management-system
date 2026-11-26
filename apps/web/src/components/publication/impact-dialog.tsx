@@ -8,6 +8,7 @@ import {
   type Impact,
   type Publication,
   type ReasonCategory,
+  type ScheduleChange,
   type Strategy,
 } from '@pms/domain'
 import { ArrowRight, Lock, TriangleAlert } from 'lucide-react'
@@ -35,40 +36,54 @@ const STRATEGIES: Strategy[] = ['absorb', 'push', 'compress', 'move_release']
 const SHOWN_MOVES = 6
 
 /**
- * Move an activity's deadline with a live impact preview: what moves, what happens to the
- * release, pinned conflicts. Nothing changes until "Flyt" is pressed.
+ * Move an activity's deadline (or change its duration) with a live impact preview: what moves,
+ * what happens to the release, pinned conflicts. Nothing changes until "Flyt" is pressed.
+ * `initial` pre-fills the change, e.g. from a drag in the Gantt chart.
  */
 export function ImpactDialog({
   publication: pub,
   activity,
+  initial,
   onOpenChange,
 }: {
   publication: Publication
   activity: Activity
+  initial?: ScheduleChange
   onOpenChange: (open: boolean) => void
 }) {
   const run = useCommand(pub.id)
   const ids = { deadline: useId(), category: useId(), reason: useId() }
-  const [deadline, setDeadline] = useState(activity.deadline)
+  const mode = initial?.kind === 'set_duration' ? 'duration' : 'deadline'
+  const [deadline, setDeadline] = useState(
+    initial?.kind === 'set_deadline' ? initial.deadline : activity.deadline,
+  )
+  const [duration, setDuration] = useState(
+    initial?.kind === 'set_duration' ? initial.durationWorkdays : activity.durationWorkdays,
+  )
   const [strategy, setStrategy] = useState<Strategy>('absorb')
   const [category, setCategory] = useState<ReasonCategory>(() => reasonCategoryFor(activity))
   const [reason, setReason] = useState('')
   const [acceptConflicts, setAcceptConflicts] = useState(false)
 
+  const change = useMemo((): ScheduleChange | null => {
+    if (mode === 'duration') {
+      return Number.isInteger(duration) && duration >= 1 && duration !== activity.durationWorkdays
+        ? { kind: 'set_duration', activityId: activity.id, durationWorkdays: duration }
+        : null
+    }
+    return deadline && deadline !== activity.deadline
+      ? { kind: 'set_deadline', activityId: activity.id, deadline }
+      : null
+  }, [mode, duration, deadline, activity])
+
   const preview = useMemo((): { impact: Impact } | { error: string } | null => {
-    if (!deadline || deadline === activity.deadline) return null
+    if (!change) return null
     try {
-      return {
-        impact: previewReschedule(
-          pub,
-          { kind: 'set_deadline', activityId: activity.id, deadline },
-          { strategy },
-        ),
-      }
+      return { impact: previewReschedule(pub, change, { strategy }) }
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) }
     }
-  }, [pub, activity, deadline, strategy])
+  }, [pub, change, strategy])
 
   const impact = preview && 'impact' in preview ? preview.impact : null
   const releaseMoves = impact ? impact.release.newTarget !== impact.release.target : false
@@ -82,9 +97,9 @@ export function ImpactDialog({
 
   function apply(e: FormEvent) {
     e.preventDefault()
-    if (!canApply) return
+    if (!canApply || !change) return
     const ok = run((p, c) =>
-      reschedule(p, { kind: 'set_deadline', activityId: activity.id, deadline }, { strategy }, c, {
+      reschedule(p, change, { strategy }, c, {
         reasonCategory: category,
         ...(reason.trim() ? { reason: reason.trim() } : {}),
         acceptConflicts,
@@ -98,27 +113,59 @@ export function ImpactDialog({
       <DialogContent className="max-w-2xl">
         <form onSubmit={apply} className="grid gap-5">
           <DialogHeader>
-            <DialogTitle>{da.impact.title}</DialogTitle>
+            <DialogTitle>
+              {mode === 'duration' ? da.impact.titleDuration : da.impact.title}
+            </DialogTitle>
             <DialogDescription>{da.impact.description(activity.name)}</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-2">
-            <Label htmlFor={ids.deadline}>{da.impact.newDeadline}</Label>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {formatDate(activity.deadline)}
-              </span>
-              <ArrowRight className="size-4 text-muted-foreground" />
-              <Input
-                id={ids.deadline}
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="w-44"
-                autoFocus
-              />
+          {mode === 'deadline' ? (
+            <div className="grid gap-2">
+              <Label htmlFor={ids.deadline}>{da.impact.newDeadline}</Label>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {formatDate(activity.deadline)}
+                </span>
+                <ArrowRight className="size-4 text-muted-foreground" />
+                <Input
+                  id={ids.deadline}
+                  type="date"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className="w-44"
+                  autoFocus
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor={ids.deadline}>{da.impact.newDuration}</Label>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground tabular-nums">
+                  {activity.durationWorkdays} {da.impact.workdays}
+                </span>
+                <ArrowRight className="size-4 text-muted-foreground" />
+                <Input
+                  id={ids.deadline}
+                  type="number"
+                  min={1}
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-24"
+                  autoFocus
+                />
+                <span>{da.impact.workdays}</span>
+                {impact && (
+                  <span className="text-muted-foreground">
+                    · {da.impact.newDeadline.toLowerCase()}{' '}
+                    {formatDate(
+                      impact.publication.activities.find((a) => a.id === activity.id)?.deadline,
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-sm font-medium">{da.impact.strategy}</legend>

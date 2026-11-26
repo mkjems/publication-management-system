@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v4 · 2026-11-26 (Phases 1–2 done; see §9 for findings)
+Status: draft v5 · 2026-11-26 (Phases 1–3 done; see §9 for findings)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -423,6 +423,22 @@ Decisions made while building it:
 - Table and Gantt stay in sync (one store).
 - _Demo:_ the publication as a Gantt chart, editable.
 
+Decisions made while building it:
+
+- **Live impact ghosts while dragging are already in** (planned for Phase 4): every drag or
+  keyboard nudge runs `previewReschedule` (absorb) and draws dashed ghosts for everything that
+  would move, plus a release marker (red if it would slip). Nothing is applied until the impact
+  dialog is confirmed.
+- The axis is calendar days (weekends and holidays shaded); dragging snaps to working days in
+  the direction of the drag. Zoom: week 28 px/day, month 8, quarter 3.
+- Done tasks are drawn at their actual dates; open tasks at their planned dates with a hatched
+  forecast tail when the forecast is later, and a thin slack tail up to the latest deadline.
+- Dependency arrows are shown for the hovered/selected activity by default; "Alle
+  afhængigheder" shows all. A new dependency (drag from the end handle) is finish-to-start with
+  no lag and does not move anything by itself; the forecast shows its effect.
+- Keyboard: Tab to a bar, ← → (Shift: a week) to nudge with live preview, Enter to open the
+  impact dialog, Esc to cancel. Enter on a bar without a nudge opens the side panel.
+
 ### Phase 4: Delays and replanning (M–L), the key differentiator
 
 - Live impact ghosts while dragging.
@@ -534,4 +550,10 @@ Found while testing Phase 2:
 - During a HOLD, overdue activities show as "Forsinket". That is accurate, but the portfolio may
   want to show "På pause" as the health of a paused book instead (Phase 5).
 
-Next: Phase 3, the interactive Gantt.
+Phase 3 is done: the interactive Gantt (zoom, collapsible rows, baseline ghosts, variance
+badges, forecast and slack tails, critical path, dependency arrows, today/release/pause lines,
+hatched preliminary plan; drag, resize, keyboard nudge and dependency creation with live
+preview).
+
+Next: Phase 4, delays and replanning: pause/resume and release-date UI, history view with the
+milestone slip chart, scenario mode and the scenario library in the UI.

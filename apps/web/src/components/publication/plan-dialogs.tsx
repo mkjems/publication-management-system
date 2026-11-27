@@ -40,6 +40,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { useCommand } from '@/hooks/use-command'
 import { REASON_CATEGORY_LABELS, da } from '@/i18n/da'
+import { errorText } from '@/lib/errors'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/store'
@@ -84,7 +85,7 @@ function tryPreview(run: () => Preview | null) {
     const p = run()
     return p ? { preview: p, error: null } : { preview: null, error: null }
   } catch (e) {
-    return { preview: null, error: e instanceof Error ? e.message : String(e) }
+    return { preview: null, error: errorText(e) }
   }
 }
 

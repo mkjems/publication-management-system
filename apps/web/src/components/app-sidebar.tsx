@@ -19,7 +19,7 @@ const NAV: NavItem[] = [
 
 export function AppSidebar() {
   return (
-    <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
+    <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r bg-sidebar md:flex print:hidden">
       <div className="flex items-center gap-2.5 px-5 py-5">
         <img src="/favicon.svg" alt="" className="size-8" />
         <div className="leading-tight">
@@ -50,7 +50,7 @@ export function AppSidebar() {
 /** Compact top navigation for narrow screens. */
 export function MobileNav() {
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b bg-sidebar px-3 py-2 md:hidden">
+    <nav className="flex gap-1 overflow-x-auto border-b bg-sidebar px-3 py-2 md:hidden print:hidden">
       {NAV.map(({ to, label }) => (
         <Link
           key={to}

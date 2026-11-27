@@ -11,7 +11,9 @@ import { LifecycleBadge } from '@/components/status/status'
 import type { PortfolioEntry } from '@/hooks/use-portfolio'
 import { da } from '@/i18n/da'
 import { formatDate } from '@/lib/format'
+import { templateOf } from '@/lib/publication'
 import { cn } from '@/lib/utils'
+import { useWorkspace } from '@/store'
 import { portfolioRow } from './rows'
 
 const LEFT = 220
@@ -27,9 +29,18 @@ function phaseColor(n: number): string {
 
 export function PortfolioGantt({ entries, asOf }: { entries: PortfolioEntry[]; asOf: IsoDate }) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const templates = useWorkspace((s) => s.templates)
   const rows = useMemo(
-    () => entries.map((e) => ({ ...e, row: portfolioRow(e.record.publication, e.health) })),
-    [entries],
+    () =>
+      entries.map((e) => ({
+        ...e,
+        row: portfolioRow(
+          e.record.publication,
+          e.health,
+          templateOf(e.record.publication, templates),
+        ),
+      })),
+    [entries, templates],
   )
   const scale = useMemo(() => {
     // From a couple of months back to the last release, at least a year ahead.

@@ -5,6 +5,7 @@
 export const da = {
   appName: 'Produktionsplan',
   appTagline: 'Bogudgivelser',
+  skipToContent: 'Spring til indholdet',
   nav: {
     overview: 'Oversigt',
     publications: 'Udgivelser',
@@ -36,6 +37,167 @@ export const da = {
     },
     milestone: 'Milepæl',
     release: 'Udgivelse',
+    version: 'Version',
+    versionOf: (n: number) => `Version ${n}`,
+    builtIn: 'Indbygget',
+    publishedOn: (date: string) => `Udgivet ${date}`,
+    usedBy: (n: number) => (n === 1 ? '1 udgivelse' : `${n} udgivelser`),
+    edit: 'Redigér masterplanen',
+    continueDraft: (n: number) => `Fortsæt kladden til version ${n}`,
+    versions: 'Versioner',
+    versionsHint:
+      'Nye udgivelser oprettes fra den nyeste version. Eksisterende udgivelser beholder den version, de blev oprettet fra.',
+    compare: 'Ændringer',
+    compareTitle: (from: number, to: number) => `Ændringer fra version ${from} til ${to}`,
+    latest: 'Nyeste',
+    draft: 'Kladde',
+  },
+
+  templateEditor: {
+    title: (n: number) => `Masterplan · kladde til version ${n}`,
+    description: (base: number) =>
+      `Ændringerne gælder kun nye udgivelser, når kladden er udgivet. Baseret på version ${base}.`,
+    noDraft: 'Der er ingen kladde af masterplanen.',
+    back: 'Tilbage til masterplanen',
+    undo: 'Fortryd',
+    discard: 'Kassér kladde',
+    discardTitle: 'Kassér kladden?',
+    discardBody: 'Alle ændringer i kladden går tabt. De udgivne versioner påvirkes ikke.',
+    publish: (n: number) => `Udgiv version ${n}`,
+    publishTitle: (n: number) => `Udgiv version ${n}`,
+    publishBody:
+      'Nye udgivelser oprettes herefter fra denne version. Eksisterende udgivelser beholder deres version.',
+    changeNote: 'Hvad er ændret?',
+    changeNotePlaceholder: 'Fx Billedresearch forlænget efter erfaringer fra forårets bøger',
+    noChanges: 'Kladden er magen til den version, den bygger på.',
+    blocked: 'Ret fejlene, før kladden kan udgives.',
+    issues: 'Problemer',
+    errors: (n: number) => (n === 1 ? '1 fejl' : `${n} fejl`),
+    warnings: (n: number) => (n === 1 ? '1 advarsel' : `${n} advarsler`),
+    noIssues: 'Ingen problemer: netværket hænger sammen.',
+    moved: (n: number) =>
+      n === 1
+        ? '1 anden aktivitet blev flyttet, så afhængighederne holder.'
+        : `${n} andre aktiviteter blev flyttet, så afhængighederne holder.`,
+    hint: 'Klik på en aktivitet for at redigere den. Varighed og deadline kan rettes direkte i tabellen; afhængige aktiviteter flyttes med.',
+    actual: 'Faktisk',
+    actualHint: (count: number, min: number, max: number) =>
+      `Median af ${count} færdige ${count === 1 ? 'opgave' : 'opgaver'} i dette datasæt (${min}–${max} arbejdsdage)`,
+    workdays: 'arbejdsdage',
+    durationLabel: 'Varighed (arbejdsdage)',
+    deadlineLabel: 'Deadline (arbejdsdage fra udgivelse)',
+    deadlineHint: 'Negativ = før udgivelse. Udgivelsen er dag 0.',
+    addActivity: 'Aktivitet',
+    addMilestone: 'Milepæl',
+    addTrack: 'Spor',
+    newActivity: 'Ny aktivitet',
+    newMilestone: 'Ny milepæl',
+    newTrack: 'Nyt spor',
+    trackName: 'Sporets navn',
+    editPhase: 'Redigér fase',
+    phaseName: 'Navn',
+    phasePeriod: 'Periode (tekst)',
+    phaseDescription: 'Beskrivelse',
+    phaseWindow: 'Nominelt vindue (arbejdsdage fra udgivelse)',
+    windowFrom: 'Fra',
+    windowTo: 'Til',
+    moveUp: 'Flyt op',
+    moveDown: 'Flyt ned',
+    moveToTrack: 'Flyt til spor',
+    fixedDuration: 'Fast varighed',
+    movedSummary: (n: number) =>
+      n === 1
+        ? '1 aktivitet flyttet, så afhængighederne holder'
+        : `${n} aktiviteter flyttet, så afhængighederne holder`,
+    error: 'Fejl',
+    warning: 'Advarsel',
+    phaseOf: (n: number, name: string) => `Fase ${n} · ${name}`,
+    change: { added: 'Tilføjet', removed: 'Fjernet', changed: 'Ændret' },
+    entity: { phase: 'Fase', track: 'Spor', activity: '' },
+    editActivity: 'Redigér',
+    moreActions: (name: string) => `${name}: flere handlinger`,
+    rename: 'Omdøb',
+    remove: 'Slet',
+    removeTrackTitle: (name: string) => `Slet sporet "${name}"?`,
+    removeTrackBody: (n: number) =>
+      n === 0
+        ? 'Sporet er tomt.'
+        : `Sporets ${n === 1 ? 'aktivitet' : `${n} aktiviteter`} slettes også. Efterfølgende aktiviteter mister afhængigheden, men beholder deres placering.`,
+    removeActivityTitle: (name: string) => `Slet "${name}"?`,
+    removeActivityBody:
+      'Efterfølgende aktiviteter mister afhængigheden, men beholder deres placering.',
+    cancel: 'Annullér',
+    save: 'Gem',
+    close: 'Luk',
+    panel: {
+      name: 'Aktivitet',
+      kind: 'Type',
+      responsible: 'Ansvarlig',
+      mode: 'Ansvar',
+      joint: 'I fællesskab (+)',
+      either: 'En af dem (/)',
+      optional: 'Valgfri',
+      optionalHint: 'Kan fravælges, når en bog oprettes ("Eventuel…").',
+      compressible: 'Kan komprimeres',
+      compressibleHint:
+        'Fjern fluebenet for leverandørtider (tryk, transport), som ikke kan forkortes for at holde udgivelsen.',
+      note: 'Note',
+      gate: 'Beslutningsport: kan ikke slettes, og typen ligger fast.',
+      releaseLocked: 'Udgivelsen er altid dag 0.',
+      predecessors: 'Afhænger af',
+      noPredecessors: 'Ingen. Aktiviteten starter netværket.',
+      successors: 'Efterfølgere',
+      addDependency: 'Tilføj afhængighed…',
+      lag: 'Forskydning',
+      removeDependency: 'Fjern afhængighed',
+      depTypes: {
+        FS: 'Starter efter slut',
+        SS: 'Starter efter start',
+        FF: 'Slutter efter slut',
+      },
+      track: 'Spor',
+      placement: (start: string, end: string) => `${start} → ${end}`,
+    },
+  },
+
+  onboarding: {
+    title: 'Kom godt i gang',
+    realBody:
+      'Her ligger dine egne udgivelser, gemt i denne browser. Start med at se masterplanen igennem, og opret så den første bog.',
+    demoBody: 'Demoen er tom. Nulstil den for at få eksempelbøgerne tilbage.',
+    masterplan: 'Gennemgå masterplanen',
+    masterplanBody:
+      'Alle planer bygger på masterplanen. Ret varigheder og afhængigheder, så de passer til forlaget.',
+    masterplanAction: 'Åbn masterplanen',
+    create: 'Opret en udgivelse',
+    createBody: 'Angiv titel og ønsket udgivelsesdato. Planen beregnes baglæns fra udgivelsen.',
+    demo: 'Prøv demoen',
+    demoStepBody:
+      'Fem eksempelbøger med forsinkelser og en tidsmaskine. Ændringer i demoen rører ikke dine data.',
+    demoAction: 'Skift til demo',
+    reset: 'Nulstil demoen',
+    resetBody: 'Bygger eksempelbøgerne op igen frem til i dag.',
+    dismiss: 'Skjul tip',
+    hints: {
+      demo: 'Du kigger på demoen. Brug Tidsmaskinen øverst til at spole tiden frem og se, hvordan planerne skrider, og skift til "Rigtige data" i menuen for dine egne bøger.',
+      publication:
+        'Tabellen svarer til masterplanens skema; Gantt viser det samme som tidslinje. Skift status direkte i tabellen, og brug "Flyt" eller træk i Gantt for at se, hvad en forsinkelse betyder, før den gemmes.',
+      masterplan:
+        'Masterplanen er skabelonen for nye udgivelser. Redigér den i en kladde og udgiv den som en ny version; eksisterende bøger beholder deres version.',
+    },
+  },
+
+  errorPage: {
+    title: 'Siden kunne ikke vises',
+    body: 'Der opstod en fejl, mens siden blev tegnet. Dine data er ikke ændret.',
+    retry: 'Prøv igen',
+    home: 'Gå til oversigten',
+  },
+
+  errors: {
+    unexpected: 'Der opstod en uventet fejl',
+    conflict:
+      'Ændringen kan ikke fortrydes, fordi planen er ændret siden. Fortryd de senere ændringer først.',
   },
 
   workspace: {
@@ -113,6 +275,9 @@ export const da = {
     newPersonName: 'Navn',
     optional: 'Valgfrie aktiviteter',
     optionalHint: 'Fravalgte aktiviteter bliver i planen som "fravalgt" og holder intet tilbage.',
+    templateVersion: 'Masterplan',
+    templateVersionOption: (n: number, latest: boolean) =>
+      latest ? `Version ${n} (nyeste)` : `Version ${n}`,
     preview: 'Forhåndsvisning',
     previewMilestones: 'Milepæle',
     compressed: (days: number) =>
@@ -124,6 +289,7 @@ export const da = {
   },
 
   publication: {
+    otherActivities: 'Øvrige aktiviteter',
     notFound: 'Udgivelsen findes ikke',
     back: 'Alle udgivelser',
     tabs: { table: 'Tabel', gantt: 'Gantt', funding: 'Finansiering', history: 'Historik' },
@@ -165,6 +331,43 @@ export const da = {
     milestones: 'Milepæle',
     phaseDone: 'færdig',
     notePlaceholder: 'Tilføj bemærkning…',
+  },
+
+  print: {
+    action: 'Udskriv',
+    actionHint: 'Udskriv eller gem planen som PDF (A3 liggende)',
+    back: 'Tilbage til udgivelsen',
+    title: 'Produktionsplan',
+    print: 'Udskriv / gem som PDF',
+    hint: 'Vælg "Gem som PDF" som printer for at få en PDF. Papirformatet sættes automatisk.',
+    gantt: 'Gantt',
+    table: 'Tabel',
+    paper: 'Papir',
+    asOfLabel: 'Status pr.',
+    simulated: 'simuleret dato',
+    kickoff: 'Startmøde',
+    release: 'Udgivelse',
+    forecast: 'Prognose',
+    projectLead: 'Projektansvarlig',
+    template: (version: number) => `Masterplan version ${version}`,
+    noteColumn: 'Bemærkning / afhængighed',
+    after: 'Efter',
+    waitingFor: 'Afventer',
+    forecastShort: 'Prognose',
+    legend: {
+      planned: 'Planlagt opgave',
+      inProgress: 'I gang',
+      done: 'Færdig',
+      waiting: 'Afventer',
+      forecast: 'Prognose efter deadline',
+      baseline: 'Oprindelig plan',
+      deadline: 'Deadline',
+      milestone: 'Milepæl',
+      today: 'Statusdato',
+      release: 'Udgivelse',
+      late: 'Forsinket',
+    },
+    nothing: 'Vælg Gantt, tabel eller begge.',
   },
 
   gantt: {
@@ -338,7 +541,6 @@ export const da = {
     nothingAttention: 'Intet er forsinket eller venter. 🎉',
     nothingThisWeek: 'Ingen deadlines eller opstarter i denne uge.',
     showAll: (n: number) => `Vis alle (${n})`,
-    empty: 'Ingen udgivelser endnu.',
   },
 
   portfolioGantt: {
@@ -670,4 +872,84 @@ export const PUSH_REASON_LABELS = {
   today: 'Ikke nået i tide',
   waiting: 'Afventer',
   started_late: 'Startede senere end planlagt',
+} as const
+
+/** Danish text for template validator issues (see `validateTemplate`). */
+export const TEMPLATE_ISSUE_TEXT = {
+  'duplicate-id': () => 'To elementer har samme id.',
+  'unknown-phase': () => 'Henviser til en fase, der ikke findes.',
+  'unknown-track': () => 'Henviser til et spor, der ikke findes.',
+  'track-phase-mismatch': () => 'Sporet ligger i en anden fase.',
+  'unknown-predecessor': () => 'Afhænger af en aktivitet, der ikke findes.',
+  'self-dependency': () => 'Afhænger af sig selv.',
+  cycle: (names: string) => `Afhængighederne går i ring: ${names}.`,
+  'dependency-violated': (pred: string, days: number) =>
+    `Ligger ${days} ${days === 1 ? 'arbejdsdag' : 'arbejdsdage'} for tidligt i forhold til "${pred}".`,
+  'duplicate-gate': () => 'Beslutningsporten findes på mere end én milepæl.',
+  'release-not-at-zero': () => 'Udgivelsen skal ligge på dag 0.',
+  'milestone-outside-window': () => 'Milepælen ligger uden for fasens nominelle vindue.',
+  'before-kickoff': (days: number) =>
+    `Starter ${days} ${days === 1 ? 'arbejdsdag' : 'arbejdsdage'} før startmødet.`,
+  'empty-track': () => 'Sporet har ingen aktiviteter.',
+  orphan: () => 'Har ingen forgængere og hænger ikke sammen med resten af planen.',
+} as const
+
+export const TEMPLATE_FIELD_LABELS = {
+  name: 'navn',
+  period: 'periode',
+  description: 'beskrivelse',
+  window: 'vindue',
+  phase: 'fase',
+  track: 'spor',
+  kind: 'type',
+  responsible: 'ansvarlig',
+  duration: 'varighed',
+  deadline: 'deadline',
+  predecessors: 'afhængigheder',
+  optional: 'valgfri',
+  compressible: 'kan komprimeres',
+  note: 'note',
+} as const
+
+/** Danish text for refused template edits (see `TemplateEditError`). */
+export const TEMPLATE_EDIT_ERROR_TEXT = {
+  unknown: 'Elementet findes ikke længere.',
+  'duplicate-id': 'Id findes allerede.',
+  'gate-locked': 'Beslutningsporte kan ikke slettes: planlægningen bygger på dem.',
+  'release-locked': 'Udgivelsen ligger altid på dag 0.',
+  'kind-locked': 'Milepæle beholder deres type.',
+  'invalid-duration': 'Varigheden skal være et helt antal arbejdsdage, mindst 1.',
+  'invalid-window': 'Vinduet kan ikke slutte, før det starter.',
+  'self-dependency': 'En aktivitet kan ikke afhænge af sig selv.',
+  'duplicate-dependency': 'Afhængigheden findes allerede.',
+  cycle: 'Det ville få afhængighederne til at gå i ring.',
+  'milestone-track': 'Milepæle ligger på fasen, ikke i et spor.',
+} as const
+
+/** Danish text for refused commands (see `CommandError`). */
+export const COMMAND_ERROR_TEXT = {
+  unknown: 'Elementet findes ikke længere.',
+  'reason-required': 'Angiv en begrundelse.',
+  'no-release': 'Planen har ingen udgivelsesmilepæl.',
+  'pinned-conflict':
+    'Ændringen ville flytte fastlåste aktiviteter. Godkend konflikten eller vælg en anden løsning.',
+  'waiting-needs-text': 'Skriv, hvad aktiviteten afventer.',
+  'finish-before-start': 'En aktivitet kan ikke blive færdig, før den er startet.',
+  'funding-insufficient':
+    'Finansieringen er ikke tilstrækkelig. Registrér bevillinger op til minimum, eller godkend risikoen under Finansiering.',
+  'not-optional': 'Kun valgfrie aktiviteter kan fravælges.',
+  'not-a-gate': 'Aktiviteten er ikke en GO / HOLD / NO-GO-beslutning.',
+  'already-decided': 'Beslutningen er allerede truffet.',
+  'publication-finished': 'Udgivelsen er afsluttet eller stoppet og kan ikke ændres sådan.',
+  'already-binding': 'Planen er allerede bindende.',
+  'not-binding': 'Kun en bindende plan har baselines.',
+  'already-paused': 'Udgivelsen er allerede sat på pause.',
+  'not-paused': 'Udgivelsen er ikke sat på pause.',
+  'resume-before-pause': 'Genoptagelsen kan ikke ligge før pausens start.',
+  'self-dependency': 'En aktivitet kan ikke afhænge af sig selv.',
+  'duplicate-dependency': 'Afhængigheden findes allerede.',
+  cycle: 'Det ville få afhængighederne til at gå i ring.',
+  'negative-amount': 'Beløbet skal være 0 eller mere.',
+  'funder-required': 'Angiv, hvem der er søgt.',
+  'decision-before-submission': 'Svaret kan ikke ligge før ansøgningen blev sendt.',
 } as const

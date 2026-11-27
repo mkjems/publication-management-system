@@ -1,6 +1,7 @@
 import { ROLE_IDS, ROLE_LABELS, type RoleId, type WorkFilter } from '@pms/domain'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
+import { GettingStarted } from '@/components/onboarding'
 import { PageHeader } from '@/components/page-header'
 import { NativeSelect } from '@/components/ui/native-select'
 import { WorkList } from '@/components/work/work-list'
@@ -109,12 +110,18 @@ function MyWorkPage() {
           </label>
         }
       />
-      {involved.length === 0 && (
-        <p className="mb-4 text-sm text-muted-foreground">{da.myWork.noPeople}</p>
+      {portfolio.length === 0 ? (
+        <GettingStarted />
+      ) : (
+        <>
+          {involved.length === 0 && (
+            <p className="mb-4 text-sm text-muted-foreground">{da.myWork.noPeople}</p>
+          )}
+          <div className="rounded-xl border bg-card px-5 pb-3 shadow-xs">
+            <WorkList items={items} empty={da.myWork.nothing} />
+          </div>
+        </>
       )}
-      <div className="rounded-xl border bg-card px-5 pb-3 shadow-xs">
-        <WorkList items={items} empty={da.myWork.nothing} />
-      </div>
     </>
   )
 }

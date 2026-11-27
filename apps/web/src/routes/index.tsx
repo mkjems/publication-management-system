@@ -1,6 +1,7 @@
 import { addDays } from '@pms/domain'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, useState, type ReactNode } from 'react'
+import { GettingStarted, Hint } from '@/components/onboarding'
 import { PageHeader } from '@/components/page-header'
 import { PortfolioGantt } from '@/components/portfolio/portfolio-gantt'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ const RISK_HORIZON_DAYS = 14
 /** Oversigt (PLAN §5.1.1): the publisher's Monday overview across all books. */
 function OverviewPage() {
   const asOf = useWorkspace((s) => s.asOf)
+  const kind = useWorkspace((s) => s.kind)
   const portfolio = usePortfolio()
   const work = usePortfolioWork(ALL)
 
@@ -74,8 +76,9 @@ function OverviewPage() {
         }
       />
 
+      {kind === 'demo' && portfolio.length > 0 && <Hint id="demo">{da.onboarding.hints.demo}</Hint>}
       {portfolio.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">{da.overview.empty}</p>
+        <GettingStarted />
       ) : (
         <div className="grid gap-6">
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border shadow-xs sm:grid-cols-3 lg:grid-cols-6">

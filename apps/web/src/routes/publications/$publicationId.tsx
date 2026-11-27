@@ -15,6 +15,7 @@ import { ZOOMS, type Zoom } from '@/components/gantt/scale'
 import { ActivityPanel } from '@/components/publication/activity-panel'
 import { FundingView } from '@/components/publication/funding-view'
 import { HistoryView } from '@/components/publication/history-view'
+import { Hint } from '@/components/onboarding'
 import { ImpactDialog } from '@/components/publication/impact-dialog'
 import { PlanTable } from '@/components/publication/plan-table'
 import { PublicationHeader } from '@/components/publication/publication-header'
@@ -22,8 +23,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { useCommand } from '@/hooks/use-command'
-import { useHealth, usePublicationRecord, useSandbox } from '@/hooks/use-publication'
+import { useHealth, usePublicationRecord, useSandbox, useTemplateOf } from '@/hooks/use-publication'
 import { da } from '@/i18n/da'
+import { errorText } from '@/lib/errors'
 import { groupActivities } from '@/lib/publication'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/store'
@@ -85,6 +87,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   const navigate = useNavigate({ from: Route.fullPath })
   const asOf = useWorkspace((s) => s.asOf)
   const health = useHealth(pub, asOf)
+  const template = useTemplateOf(pub)
   const showFlash = useFlash((s) => s.show)
   const [toggled, setToggled] = useState<Set<string>>(() => new Set())
   const [pending, setPending] = useState<{ activityId: string; change?: ScheduleChange } | null>(
@@ -111,7 +114,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
         if (e.shiftKey && h?.redoable.length) s.redo(pub.id)
         else if (!e.shiftKey && h?.undoable.length) s.undo(pub.id)
       } catch (err) {
-        showFlash(err instanceof Error ? err.message : String(err))
+        showFlash(errorText(err))
       }
     }
     window.addEventListener('keydown', onKey)
@@ -128,8 +131,8 @@ function PublicationView({ record }: { record: PublicationRecord }) {
       if (filter === 'open' && (state === 'done' || state === 'skipped')) return false
       return true
     })
-    return groupActivities(pub, visible)
-  }, [pub, health, search.q, search.role, filter])
+    return groupActivities(pub, visible, template)
+  }, [pub, health, search.q, search.role, filter, template])
 
   const usedRoles = useMemo(
     () => ROLE_IDS.filter((r) => pub.activities.some((a) => a.responsible.roles.includes(r))),
@@ -172,6 +175,7 @@ function PublicationView({ record }: { record: PublicationRecord }) {
   return (
     <>
       <PublicationHeader record={record} health={health} />
+      <Hint id="publication">{da.onboarding.hints.publication}</Hint>
 
       <nav className="mb-4 flex gap-1 border-b" aria-label="Visninger">
         {TABS.map((t) => (

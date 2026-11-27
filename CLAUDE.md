@@ -21,7 +21,9 @@ dependencies.
   scenario books in the demo.
 - Phase 5 is done: Oversigt (portfolio Gantt), Mine opgaver, funding tab and gate logic, role
   assignments, stress simulation.
-- Next: **Phase 6**, template editor, polish and client validation (PLAN §6).
+- Phase 6 is built: master plan editor with versions, print/PDF view, Danish error messages,
+  onboarding, accessibility and performance pass. Pending: client test sessions
+  (`docs/klienttest.md`). After that: Stage B (PLAN §7).
 
 ## Layout
 
@@ -29,15 +31,19 @@ dependencies.
 apps/web          React 19 + Vite 8, TanStack Router (file routes in src/routes), Tailwind v4, shadcn/ui
   data/           WorkspaceRepository: IndexedDB (one database per workspace) and in-memory
   store/          Zustand workspace store: all plan changes go through `execute(id, command)`;
-                  in scenario mode they go to the sandbox copy (read records via `selectRecord`)
+                  in scenario mode they go to the sandbox copy (read records via `selectRecord`).
+                  Master plan versions and the draft live here too (`editTemplateDraft`)
   lib/clock.ts    the only place that reads the system clock
   components/     publication/ (table, panel, dialogs, funding), gantt/ (chart; scale.ts and
                   rows.ts are pure and tested), portfolio/ (portfolio Gantt), work/ (work lists),
+                  masterplan/ (view; editor/ is the master plan editor), print/ (print view),
                   workspace/ (Tidsmaskine), ui/
+  lib/errors.ts   Danish text for refused commands and template edits (by error code)
 packages/domain   Framework-free TypeScript, no build step:
   calendar/       working-day calendar (Danish holidays, closures), date helpers
   model/          Zod schemas: template, publication, activity, events
-  templates/      master plan data, builder DSL, validator
+  templates/      master plan data, builder DSL, validator; edit.ts (editor operations),
+                  library.ts (versions, drafts, compareTemplates, actualDurations)
   engine/         generatePlan, analyzePlan (forecast/slack/critical path), previewReschedule,
                   shiftPlan, assessHealth, comparePlans, fundingStatus, workItems;
                   constraints.ts defines FS/SS/FF
@@ -71,6 +77,11 @@ pnpm format       # prettier --write
 - Mutations go through commands that emit `ChangeEvent`s (undo/redo, audit, later API sync).
   Commands take a `CommandContext` (`asOf`, `recordedAt`, `by`, `newId`); the domain never
   generates ids or timestamps itself.
+- Refused commands throw `CommandError(code, message)`; template edits throw
+  `TemplateEditError(code, message)`. Messages are English; the UI shows `errorText(e)` from
+  `lib/errors.ts`. A new code needs a Danish text in `da.ts` (the types enforce it).
+- Published master plan versions never change. Edits go to the draft via `templates/edit.ts`;
+  gate milestones cannot be removed and the release stays on day 0.
 - Never overwrite the baseline (_Oprindelig deadline_); changes go to the current deadline and are
   logged. Baselines are numbered snapshots on the publication; baseline 0 is the original.
 - Code, identifiers and comments are in English. **UI text is Danish** and lives in

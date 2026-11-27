@@ -4,11 +4,16 @@
  * are logged, undoable and persisted the same way.
  */
 import {
+  BUILT_IN_TEMPLATES,
   MASTERPLAN_V1,
   SCENARIOS,
   addDays,
   advanceSimulation,
+  createDraft,
+  findTemplate,
   generatePlan,
+  latestTemplate,
+  publishDraft,
   record,
   redo as redoHistory,
   scenarioBook,
@@ -21,6 +26,8 @@ import {
   type Person,
   type Publication,
   type PublicationRecord,
+  type Template,
+  type TemplateEditResult,
   type WorkspaceKind,
   type WorkspaceSnapshot,
 } from '@pms/domain'
@@ -29,6 +36,8 @@ import type { WorkspaceData, WorkspaceRepository } from '@/data/repository'
 import type { SystemClock } from '@/lib/clock'
 
 export interface NewPublicationInput {
+  /** The master plan version to generate from. Default: the latest. */
+  template?: { id: string; version: number }
   workingTitle: string
   desiredReleaseDate: IsoDate
   kickoffDate?: IsoDate
@@ -70,6 +79,12 @@ export interface WorkspaceState {
   /** The business date for everything that depends on "today". */
   asOf: IsoDate
   sandbox: Sandbox | null
+  /** Published master plan versions: the built-in ones plus the workspace's own. */
+  templates: Template[]
+  /** Unpublished drafts by template id (the master plan editor). */
+  templateDrafts: Record<string, Template>
+  /** Earlier states of each draft, for undo in the editor. In memory only. */
+  templateUndo: Record<string, Template[]>
 
   load(kind?: WorkspaceKind): Promise<void>
   createPublication(input: NewPublicationInput): string
@@ -97,6 +112,20 @@ export interface WorkspaceState {
   travelTo(date: IsoDate): void
   /** Demo only. Rebuilds the demo data as of today. */
   resetDemo(): void
+  /** Starts a draft of the next version of a template, copied from the latest version. */
+  startTemplateDraft(templateId: string): Template
+  /**
+   * Applies an edit (from `@pms/domain` templates/edit) to the draft. Throws the edit's error.
+   * Returns which other activities the edit moved.
+   */
+  editTemplateDraft(
+    templateId: string,
+    edit: (draft: Template) => Template | TemplateEditResult,
+  ): TemplateEditResult
+  undoTemplateEdit(templateId: string): void
+  discardTemplateDraft(templateId: string): void
+  /** Publishes the draft as the next version. Throws while the draft has errors. */
+  publishTemplateDraft(templateId: string, changeNote: string): Template
   exportSnapshot(): WorkspaceSnapshot
   /** Replaces the current workspace with an imported one. */
   importSnapshot(snapshot: WorkspaceSnapshot): Promise<void>
@@ -150,6 +179,9 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
         status: 'ready',
         error: null,
         sandbox: null,
+        templates: mergeTemplates(data.templates),
+        templateDrafts: Object.fromEntries(data.templateDrafts.map((t) => [t.id, t])),
+        templateUndo: {},
         people: data.people,
         records,
         order: sortOrder(data.publications),
@@ -158,13 +190,25 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
         asOf: simulatedDate ?? realToday,
       })
     }
-    const seedDemo = (date: IsoDate): WorkspaceData => {
+    /** Workspace-made template versions and drafts; they survive demo resets and time travel. */
+    const ownTemplates = () => ({
+      templates: get().templates.filter((t) => !BUILT_IN_TEMPLATES.includes(t)),
+      templateDrafts: Object.values(get().templateDrafts),
+    })
+    const seedDemo = (date: IsoDate, keep = ownTemplates()): WorkspaceData => {
       const demo = seedDemoWorkspace({
         today: date,
         recordedAt: deps.clock.now(),
         newId: deps.newId,
       })
-      return { ...demo, simulatedDate: date }
+      return { ...demo, simulatedDate: date, ...keep }
+    }
+    const setDraft = (templateId: string, draft: Template | null, undo: Template[]) => {
+      const drafts = { ...get().templateDrafts }
+      if (draft) drafts[templateId] = draft
+      else delete drafts[templateId]
+      set({ templateDrafts: drafts, templateUndo: { ...get().templateUndo, [templateId]: undo } })
+      repo().saveTemplateDraft(templateId, draft).catch(fail)
     }
 
     let inflight: { kind: WorkspaceKind; promise: Promise<void> } | null = null
@@ -180,6 +224,9 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
       realToday: today,
       asOf: today,
       sandbox: null,
+      templates: [...BUILT_IN_TEMPLATES],
+      templateDrafts: {},
+      templateUndo: {},
 
       load(kind = get().kind) {
         // React StrictMode runs effects twice; share one load per workspace.
@@ -190,7 +237,10 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
           try {
             let data = await deps.repository(kind).load()
             if (kind === 'demo' && data.publications.length === 0 && data.simulatedDate === null) {
-              data = seedDemo(deps.clock.today())
+              data = seedDemo(deps.clock.today(), {
+                templates: data.templates,
+                templateDrafts: data.templateDrafts,
+              })
               await deps.repository(kind).replaceAll(data)
             }
             if (get().kind === kind) applyData(kind, data)
@@ -222,10 +272,14 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
           set({ people })
           repo().savePeople(people).catch(fail)
         }
+        const template = input.template
+          ? findTemplate(get().templates, input.template.id, input.template.version)
+          : latestTemplate(get().templates, MASTERPLAN_V1.id)
+        if (!template) throw new Error('Unknown master plan version')
         const { publication } = generatePlan({
           id: deps.newId(),
           workingTitle: input.workingTitle.trim(),
-          template: MASTERPLAN_V1,
+          template,
           desiredReleaseDate: input.desiredReleaseDate,
           ...(input.kickoffDate ? { kickoffDate: input.kickoffDate } : {}),
           skipOptional: input.skipOptional,
@@ -372,8 +426,51 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
         repo().replaceAll(data).catch(fail)
       },
 
+      startTemplateDraft(templateId) {
+        const existing = get().templateDrafts[templateId]
+        if (existing) return existing
+        const latest = latestTemplate(get().templates, templateId)
+        if (!latest) throw new Error(`Unknown template ${templateId}`)
+        const draft = createDraft(latest, latest.version + 1)
+        setDraft(templateId, draft, [])
+        return draft
+      },
+
+      editTemplateDraft(templateId, edit) {
+        const draft = get().templateDrafts[templateId]
+        if (!draft) throw new Error('There is no draft to edit')
+        const out = edit(draft)
+        const result = 'template' in out ? out : { template: out, moved: [] }
+        if (result.template !== draft) {
+          const undo = [...(get().templateUndo[templateId] ?? []), draft].slice(-UNDO_LIMIT)
+          setDraft(templateId, result.template, undo)
+        }
+        return result
+      },
+
+      undoTemplateEdit(templateId) {
+        const undo = [...(get().templateUndo[templateId] ?? [])]
+        const previous = undo.pop()
+        if (previous) setDraft(templateId, previous, undo)
+      },
+
+      discardTemplateDraft(templateId) {
+        setDraft(templateId, null, [])
+      },
+
+      publishTemplateDraft(templateId, changeNote) {
+        const draft = get().templateDrafts[templateId]
+        if (!draft) throw new Error('There is no draft to publish')
+        const published = publishDraft(draft, get().asOf, changeNote)
+        set({ templates: mergeTemplates([...get().templates, published]) })
+        repo().saveTemplate(published).catch(fail)
+        setDraft(templateId, null, [])
+        return published
+      },
+
       exportSnapshot() {
         const s = get()
+        const own = ownTemplates()
         return {
           format: 'pms-workspace',
           version: 1,
@@ -382,6 +479,8 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
           simulatedDate: s.simulatedDate,
           people: s.people,
           publications: s.order.map((id) => s.records[id]!),
+          ...(own.templates.length ? { templates: own.templates } : {}),
+          ...(own.templateDrafts.length ? { templateDrafts: own.templateDrafts } : {}),
         }
       },
 
@@ -395,6 +494,8 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
               ? snapshot.publications
               : snapshot.publications.map(({ simulation: _s, ...r }) => r),
           simulatedDate: kind === 'demo' ? (snapshot.simulatedDate ?? deps.clock.today()) : null,
+          templates: snapshot.templates ?? [],
+          templateDrafts: snapshot.templateDrafts ?? [],
         }
         await repo().replaceAll(data)
         applyData(kind, data)
@@ -404,6 +505,19 @@ export function createWorkspaceStore(deps: StoreDeps, initialKind: WorkspaceKind
 }
 
 export type WorkspaceStore = ReturnType<typeof createWorkspaceStore>
+
+const UNDO_LIMIT = 100
+
+/** Built-in versions plus the workspace's own, without duplicates, oldest first. */
+function mergeTemplates(own: readonly Template[]): Template[] {
+  const all = new Map<string, Template>()
+  for (const t of [...BUILT_IN_TEMPLATES, ...own]) {
+    const key = `${t.id}@${t.version}`
+    // Built-in versions win: they are what the app's own data refers to.
+    if (!all.has(key)) all.set(key, t)
+  }
+  return [...all.values()].sort((a, b) => a.id.localeCompare(b.id) || a.version - b.version)
+}
 
 function mustGet(records: Record<string, PublicationRecord>, id: string): PublicationRecord {
   const r = records[id]

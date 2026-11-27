@@ -421,6 +421,7 @@ class Planner {
       const candidates = this.drivingChain(release.id).filter((id) => {
         const a = this.get(id)
         if (a.kind !== 'task' || a.pinned || a.status !== 'not_started') return false
+        if (a.compressible === false) return false
         if (!this.downstream.has(id)) return false
         return a.durationWorkdays > minDuration(original.get(id)!, fraction)
       })

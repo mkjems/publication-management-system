@@ -10,25 +10,32 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as MasterplanRouteImport } from './routes/masterplan'
 import { Route as MyWorkRouteImport } from './routes/my-work'
+import { Route as MasterplanIndexRouteImport } from './routes/masterplan/index'
+import { Route as MasterplanEditRouteImport } from './routes/masterplan/edit'
 import { Route as PublicationsIndexRouteImport } from './routes/publications/index'
 import { Route as PublicationsPublicationIdRouteImport } from './routes/publications/$publicationId'
 import { Route as PublicationsNewRouteImport } from './routes/publications/new'
+import { Route as PublicationsPublicationIdPrintRouteImport } from './routes/publications/$publicationId_.print'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MasterplanRoute = MasterplanRouteImport.update({
-  id: '/masterplan',
-  path: '/masterplan',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MyWorkRoute = MyWorkRouteImport.update({
   id: '/my-work',
   path: '/my-work',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterplanIndexRoute = MasterplanIndexRouteImport.update({
+  id: '/masterplan/',
+  path: '/masterplan/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterplanEditRoute = MasterplanEditRouteImport.update({
+  id: '/masterplan/edit',
+  path: '/masterplan/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PublicationsIndexRoute = PublicationsIndexRouteImport.update({
@@ -47,66 +54,86 @@ const PublicationsNewRoute = PublicationsNewRouteImport.update({
   path: '/publications/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicationsPublicationIdPrintRoute =
+  PublicationsPublicationIdPrintRouteImport.update({
+    id: '/publications/$publicationId_/print',
+    path: '/publications/$publicationId/print',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/masterplan': typeof MasterplanRoute
   '/my-work': typeof MyWorkRoute
+  '/masterplan/edit': typeof MasterplanEditRoute
   '/publications/$publicationId': typeof PublicationsPublicationIdRoute
   '/publications/new': typeof PublicationsNewRoute
+  '/masterplan/': typeof MasterplanIndexRoute
   '/publications/': typeof PublicationsIndexRoute
+  '/publications/$publicationId/print': typeof PublicationsPublicationIdPrintRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/masterplan': typeof MasterplanRoute
   '/my-work': typeof MyWorkRoute
+  '/masterplan/edit': typeof MasterplanEditRoute
   '/publications/$publicationId': typeof PublicationsPublicationIdRoute
   '/publications/new': typeof PublicationsNewRoute
+  '/masterplan': typeof MasterplanIndexRoute
   '/publications': typeof PublicationsIndexRoute
+  '/publications/$publicationId/print': typeof PublicationsPublicationIdPrintRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/masterplan': typeof MasterplanRoute
   '/my-work': typeof MyWorkRoute
+  '/masterplan/edit': typeof MasterplanEditRoute
   '/publications/$publicationId': typeof PublicationsPublicationIdRoute
   '/publications/new': typeof PublicationsNewRoute
+  '/masterplan/': typeof MasterplanIndexRoute
   '/publications/': typeof PublicationsIndexRoute
+  '/publications/$publicationId_/print': typeof PublicationsPublicationIdPrintRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/masterplan'
     | '/my-work'
+    | '/masterplan/edit'
     | '/publications/$publicationId'
     | '/publications/new'
+    | '/masterplan/'
     | '/publications/'
+    | '/publications/$publicationId/print'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/masterplan'
     | '/my-work'
+    | '/masterplan/edit'
     | '/publications/$publicationId'
     | '/publications/new'
+    | '/masterplan'
     | '/publications'
+    | '/publications/$publicationId/print'
   id:
     | '__root__'
     | '/'
-    | '/masterplan'
     | '/my-work'
+    | '/masterplan/edit'
     | '/publications/$publicationId'
     | '/publications/new'
+    | '/masterplan/'
     | '/publications/'
+    | '/publications/$publicationId_/print'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  MasterplanRoute: typeof MasterplanRoute
   MyWorkRoute: typeof MyWorkRoute
+  MasterplanEditRoute: typeof MasterplanEditRoute
   PublicationsPublicationIdRoute: typeof PublicationsPublicationIdRoute
   PublicationsNewRoute: typeof PublicationsNewRoute
+  MasterplanIndexRoute: typeof MasterplanIndexRoute
   PublicationsIndexRoute: typeof PublicationsIndexRoute
+  PublicationsPublicationIdPrintRoute: typeof PublicationsPublicationIdPrintRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -118,18 +145,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/masterplan': {
-      id: '/masterplan'
-      path: '/masterplan'
-      fullPath: '/masterplan'
-      preLoaderRoute: typeof MasterplanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/my-work': {
       id: '/my-work'
       path: '/my-work'
       fullPath: '/my-work'
       preLoaderRoute: typeof MyWorkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/masterplan/': {
+      id: '/masterplan/'
+      path: '/masterplan'
+      fullPath: '/masterplan/'
+      preLoaderRoute: typeof MasterplanIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/masterplan/edit': {
+      id: '/masterplan/edit'
+      path: '/masterplan/edit'
+      fullPath: '/masterplan/edit'
+      preLoaderRoute: typeof MasterplanEditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/publications/': {
@@ -153,16 +187,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicationsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/publications/$publicationId_/print': {
+      id: '/publications/$publicationId_/print'
+      path: '/publications/$publicationId/print'
+      fullPath: '/publications/$publicationId/print'
+      preLoaderRoute: typeof PublicationsPublicationIdPrintRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  MasterplanRoute: MasterplanRoute,
   MyWorkRoute: MyWorkRoute,
+  MasterplanEditRoute: MasterplanEditRoute,
   PublicationsPublicationIdRoute: PublicationsPublicationIdRoute,
   PublicationsNewRoute: PublicationsNewRoute,
+  MasterplanIndexRoute: MasterplanIndexRoute,
   PublicationsIndexRoute: PublicationsIndexRoute,
+  PublicationsPublicationIdPrintRoute: PublicationsPublicationIdPrintRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -16,8 +16,11 @@ export {
   validateTemplate,
   MILESTONE_WINDOW_TOLERANCE,
   type TemplateIssue,
+  type TemplateIssueCode,
 } from './templates/validate'
 export { MASTERPLAN_V1 } from './templates/masterplan-v1'
+export * from './templates/edit'
+export * from './templates/library'
 
 // Scheduling engine
 export { topologicalOrder, type TopoResult } from './engine/graph'

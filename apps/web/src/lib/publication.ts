@@ -1,6 +1,9 @@
 import {
+  BUILT_IN_TEMPLATES,
   MASTERPLAN_V1,
   ROLE_LABELS,
+  findTemplate,
+  latestTemplate,
   type RoleId,
   originalBaseline,
   type Activity,
@@ -21,12 +24,17 @@ import {
 } from '@/i18n/da'
 import { formatDate, formatMoney } from './format'
 
-const TEMPLATES: Template[] = [MASTERPLAN_V1]
-
-/** The template a publication was generated from (for phase and track names). */
-export function templateOf(pub: Publication): Template {
+/**
+ * The template version a publication was generated from (for phase and track names). Falls back
+ * to the latest version of the same template, e.g. for a book imported without its version.
+ */
+export function templateOf(
+  pub: Publication,
+  templates: readonly Template[] = BUILT_IN_TEMPLATES,
+): Template {
   return (
-    TEMPLATES.find((t) => t.id === pub.templateId && t.version === pub.templateVersion) ??
+    findTemplate(templates, pub.templateId, pub.templateVersion) ??
+    latestTemplate(templates, pub.templateId) ??
     MASTERPLAN_V1
   )
 }
@@ -51,12 +59,23 @@ export interface PhaseRows {
   activities: Activity[]
 }
 
-/** Activities grouped Phase → Track, in template order. */
-export function groupActivities(pub: Publication, activities = pub.activities): PhaseRows[] {
-  const t = templateOf(pub)
-  return t.phases
+/**
+ * Activities grouped Phase → Track, in template order. Activities whose phase or track is not in
+ * the template (a fallback template, see `templateOf`) are kept in an extra group at the end, so
+ * nothing silently disappears from the plan.
+ */
+export function groupActivities(
+  pub: Publication,
+  activities = pub.activities,
+  t: Template = templateOf(pub),
+): PhaseRows[] {
+  const trackIds = new Set(t.tracks.map((tr) => tr.id))
+  const phaseIds = new Set(t.phases.map((p) => p.id))
+  const known = (a: Activity) =>
+    phaseIds.has(a.phaseId) && (a.trackId === null || trackIds.has(a.trackId))
+  const groups = t.phases
     .map((phase) => {
-      const inPhase = activities.filter((a) => a.phaseId === phase.id)
+      const inPhase = activities.filter((a) => a.phaseId === phase.id && known(a))
       return {
         phase,
         tracks: t.tracks
@@ -68,6 +87,25 @@ export function groupActivities(pub: Publication, activities = pub.activities): 
       }
     })
     .filter((g) => g.activities.length > 0)
+  const unknown = activities.filter((a) => !known(a))
+  if (unknown.length) {
+    const phase: PhaseTemplate = {
+      id: '__other',
+      number: t.phases.length + 1,
+      name: da.publication.otherActivities,
+      period: '',
+      window: { startOffset: 0, endOffset: 0 },
+      anchor: 'release',
+    }
+    const track: TrackTemplate = { id: '__other-track', phaseId: phase.id, name: phase.name }
+    groups.push({
+      phase,
+      tracks: [{ track, activities: unknown }],
+      milestones: [],
+      activities: unknown,
+    })
+  }
+  return groups
 }
 
 export function nextMilestone(pub: Publication): Activity | undefined {

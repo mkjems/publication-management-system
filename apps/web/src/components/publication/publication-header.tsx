@@ -19,6 +19,7 @@ import {
   Trash2,
   Undo2,
   Users,
+  Printer,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -38,7 +39,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { usePersonName, useSandbox } from '@/hooks/use-publication'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { da } from '@/i18n/da'
+import { errorText } from '@/lib/errors'
 import { formatDate } from '@/lib/format'
 import { useWorkspace } from '@/store'
 import { useFlash } from '@/store/flash'
@@ -54,6 +57,7 @@ export function PublicationHeader({
   health: PublicationHealth
 }) {
   const pub = record.publication
+  useDocumentTitle(pub.workingTitle)
   const lead = usePersonName(pub.projectLeadId)
   const undo = useWorkspace((s) => s.undo)
   const redo = useWorkspace((s) => s.redo)
@@ -73,7 +77,7 @@ export function PublicationHeader({
     try {
       f()
     } catch (e) {
-      show(e instanceof Error ? e.message : String(e))
+      show(errorText(e))
     }
   }
 
@@ -165,6 +169,12 @@ export function PublicationHeader({
           >
             <Redo2 />
             {da.publication.redo}
+          </Button>
+          <Button variant="outline" size="sm" asChild title={da.print.actionHint}>
+            <Link to="/publications/$publicationId/print" params={{ publicationId: pub.id }}>
+              <Printer />
+              {da.print.action}
+            </Link>
           </Button>
           <Button
             variant="ghost"

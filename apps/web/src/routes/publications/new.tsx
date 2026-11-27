@@ -1,9 +1,13 @@
 import {
   DEFAULT_CALENDAR,
   MASTERPLAN_V1,
+  findTemplate,
   generatePlan,
   getCalendar,
+  latestTemplate,
+  templateVersions,
   type GeneratedPlan,
+  type Template,
 } from '@pms/domain'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { TriangleAlert } from 'lucide-react'
@@ -24,9 +28,7 @@ export const Route = createFileRoute('/publications/new')({
 })
 
 const cal = getCalendar(DEFAULT_CALENDAR)
-const template = MASTERPLAN_V1
-const phaseNumber = new Map(template.phases.map((p) => [p.id, p.number]))
-const optionalActivities = template.activities.filter((a) => a.optional)
+const TEMPLATE_ID = MASTERPLAN_V1.id
 const NEW_PERSON = '__new__'
 
 function NewPublicationPage() {
@@ -34,7 +36,30 @@ function NewPublicationPage() {
   const people = useWorkspace((s) => s.people)
   const createPublication = useWorkspace((s) => s.createPublication)
   const navigate = useNavigate()
-  const ids = { title: useId(), release: useId(), kickoff: useId(), lead: useId(), name: useId() }
+  const ids = {
+    title: useId(),
+    release: useId(),
+    kickoff: useId(),
+    lead: useId(),
+    name: useId(),
+    version: useId(),
+  }
+  const templates = useWorkspace((s) => s.templates)
+  const versions = useMemo(() => templateVersions(templates, TEMPLATE_ID), [templates])
+  const latestVersion = versions.at(-1)?.version ?? MASTERPLAN_V1.version
+  const [version, setVersion] = useState(latestVersion)
+  const template = useMemo(
+    () =>
+      findTemplate(templates, TEMPLATE_ID, version) ??
+      latestTemplate(templates, TEMPLATE_ID) ??
+      MASTERPLAN_V1,
+    [templates, version],
+  )
+  const phaseNumber = new Map(template.phases.map((p) => [p.id, p.number]))
+  const optionalActivities = template.activities.filter((a) => a.optional)
+  /** Skipped activities that exist (and are optional) in the chosen version. */
+  const skipIn = (t: Template, skip: Set<string>) =>
+    t.activities.filter((a) => a.optional && skip.has(a.id)).map((a) => a.id)
 
   const [title, setTitle] = useState('')
   // Default: the template's nominal length from today, plus two weeks to prepare.
@@ -55,12 +80,12 @@ function NewPublicationPage() {
         template,
         desiredReleaseDate: release,
         ...(kickoff ? { kickoffDate: kickoff } : {}),
-        skipOptional: [...skip],
+        skipOptional: skipIn(template, skip),
       })
     } catch {
       return null
     }
-  }, [title, release, kickoff, skip])
+  }, [title, release, kickoff, skip, template])
 
   const valid =
     title.trim().length > 0 && preview !== null && (lead !== NEW_PERSON || newName.trim())
@@ -69,10 +94,11 @@ function NewPublicationPage() {
     e.preventDefault()
     if (!valid) return
     const id = createPublication({
+      template: { id: template.id, version: template.version },
       workingTitle: title,
       desiredReleaseDate: release,
       ...(kickoff ? { kickoffDate: kickoff } : {}),
-      skipOptional: [...skip],
+      skipOptional: skipIn(template, skip),
       projectLead: lead === NEW_PERSON ? { name: newName } : lead ? { id: lead } : null,
     })
     void navigate({ to: '/publications/$publicationId', params: { publicationId: id } })
@@ -149,6 +175,22 @@ function NewPublicationPage() {
                   </div>
                 )}
               </div>
+              {versions.length > 1 && (
+                <div className="grid gap-2 sm:max-w-[calc(50%-0.625rem)]">
+                  <Label htmlFor={ids.version}>{da.wizard.templateVersion}</Label>
+                  <NativeSelect
+                    id={ids.version}
+                    value={version}
+                    onChange={(e) => setVersion(Number(e.target.value))}
+                  >
+                    {[...versions].reverse().map((v) => (
+                      <option key={v.version} value={v.version}>
+                        {da.wizard.templateVersionOption(v.version, v.version === latestVersion)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              )}
             </CardContent>
           </Card>
 

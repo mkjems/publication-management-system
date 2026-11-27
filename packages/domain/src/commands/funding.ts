@@ -19,7 +19,7 @@ export function setFundingTarget(
   meta: ChangeMeta = {},
 ): CommandResult {
   if (changes.minimumRequired !== undefined && !(changes.minimumRequired >= 0)) {
-    throw new CommandError('The minimum must be zero or more')
+    throw new CommandError('negative-amount', 'The minimum must be zero or more')
   }
   const tx = new Transaction(ctx, pub)
   tx.record(
@@ -59,7 +59,7 @@ export function updateFundingApplication(
   options: { on?: IsoDate } & ChangeMeta = {},
 ): CommandResult {
   const before = pub.funding.applications.find((a) => a.id === applicationId)
-  if (!before) throw new CommandError(`Unknown funding application "${applicationId}"`)
+  if (!before) throw new CommandError('unknown', `Unknown funding application "${applicationId}"`)
   const on = options.on ?? ctx.asOf
   const next: FundingApplication = { ...before, ...changes }
   if (next.status !== 'planned' && next.submittedAt === null) next.submittedAt = on
@@ -99,7 +99,7 @@ export function removeFundingApplication(
   ctx: CommandContext,
 ): CommandResult {
   const a = pub.funding.applications.find((x) => x.id === applicationId)
-  if (!a) throw new CommandError(`Unknown funding application "${applicationId}"`)
+  if (!a) throw new CommandError('unknown', `Unknown funding application "${applicationId}"`)
   const tx = new Transaction(ctx, pub)
   tx.record(
     'funding_changed',
@@ -117,9 +117,13 @@ function withFunding(pub: Publication, funding: Funding): Publication {
 }
 
 function validate(a: FundingApplicationInput) {
-  if (!a.funder.trim()) throw new CommandError('A funding application needs a funder')
-  if (!(a.amount >= 0)) throw new CommandError('The amount must be zero or more')
+  if (!a.funder.trim())
+    throw new CommandError('funder-required', 'A funding application needs a funder')
+  if (!(a.amount >= 0)) throw new CommandError('negative-amount', 'The amount must be zero or more')
   if (a.submittedAt && a.decidedAt && a.decidedAt < a.submittedAt) {
-    throw new CommandError('A decision cannot come before the application was submitted')
+    throw new CommandError(
+      'decision-before-submission',
+      'A decision cannot come before the application was submitted',
+    )
   }
 }

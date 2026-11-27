@@ -91,6 +91,7 @@ export function generatePlan(input: GeneratePlanInput): GeneratedPlan {
       waitingFor: null,
       pinned: false,
       optional: t.optional,
+      ...(t.compressible === false ? { compressible: false } : {}),
       gate: t.gate ?? null,
       note: t.note ?? '',
       predecessors: t.predecessors.map((d) => ({ ...d })),

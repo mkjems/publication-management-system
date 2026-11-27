@@ -1,7 +1,13 @@
 import 'fake-indexeddb/auto'
 import {
   CommandError,
+  MASTERPLAN_V1,
+  TemplateEditError,
+  createDraft,
   getCalendar,
+  publishDraft,
+  removeTemplateActivity,
+  rescheduleTemplateActivity,
   DEFAULT_CALENDAR,
   reschedule,
   setStatus,
@@ -224,6 +230,19 @@ describe('IndexedDbWorkspaceRepository', () => {
     await real.deletePublication(id)
     expect((await real.load()).publications).toEqual([])
   })
+
+  it('stores published versions and drafts', async () => {
+    const repo = new IndexedDbWorkspaceRepository('real')
+    const v2 = publishDraft(createDraft(MASTERPLAN_V1, 2), TODAY, 'Ny version')
+    await repo.saveTemplate(v2)
+    await repo.saveTemplateDraft('masterplan', createDraft(v2, 3))
+    let data = await repo.load()
+    expect(data.templates).toEqual([v2])
+    expect(data.templateDrafts.map((t) => t.version)).toEqual([3])
+    await repo.saveTemplateDraft('masterplan', null)
+    data = await repo.load()
+    expect(data.templateDrafts).toEqual([])
+  })
 })
 
 describe('workspace store: scenario mode', () => {
@@ -324,5 +343,82 @@ describe('workspace store: scenario library', () => {
         desiredReleaseDate: '2027-11-05',
       }),
     ).toThrow('demo')
+  })
+})
+
+describe('workspace store: master plan versions', () => {
+  it('drafts, edits, undoes and publishes a new version', async () => {
+    const { store, repos } = setup()
+    await store.getState().load()
+    const draft = store.getState().startTemplateDraft('masterplan')
+    expect(draft.version).toBe(2)
+    // Starting again returns the same draft.
+    expect(store.getState().startTemplateDraft('masterplan')).toBe(draft)
+
+    const { moved } = store
+      .getState()
+      .editTemplateDraft('masterplan', (t) =>
+        rescheduleTemplateActivity(t, 'image-research', { durationWorkdays: 40 }),
+      )
+    expect(moved.length).toBeGreaterThan(0)
+    store.getState().editTemplateDraft('masterplan', (t) => removeTemplateActivity(t, 'colophon'))
+    store.getState().undoTemplateEdit('masterplan')
+    const edited = store.getState().templateDrafts.masterplan!
+    expect(edited.activities.some((a) => a.id === 'colophon')).toBe(true)
+    expect(edited.activities.find((a) => a.id === 'image-research')!.durationWorkdays).toBe(40)
+
+    const v2 = store.getState().publishTemplateDraft('masterplan', 'Længere billedresearch')
+    expect(v2).toMatchObject({ version: 2, publishedOn: TODAY })
+    expect(store.getState().templateDrafts).toEqual({})
+    expect(store.getState().templates.map((t) => t.version)).toEqual([1, 2])
+    await flush()
+    expect(repos.real.data.templates.map((t) => t.version)).toEqual([2])
+    expect(repos.real.data.templateDrafts).toEqual([])
+
+    // New books use the latest version unless another is chosen.
+    const input = {
+      workingTitle: 'Bog',
+      desiredReleaseDate: '2027-11-05',
+      skipOptional: [],
+      projectLead: null,
+    }
+    const latest = store.getState().createPublication(input)
+    const older = store
+      .getState()
+      .createPublication({ ...input, template: { id: 'masterplan', version: 1 } })
+    expect(store.getState().records[latest]!.publication.templateVersion).toBe(2)
+    expect(store.getState().records[older]!.publication.templateVersion).toBe(1)
+  })
+
+  it('refuses edits that break the rules, leaving the draft unchanged', async () => {
+    const { store } = setup()
+    await store.getState().load()
+    store.getState().startTemplateDraft('masterplan')
+    const before = store.getState().templateDrafts.masterplan
+    expect(() =>
+      store
+        .getState()
+        .editTemplateDraft('masterplan', (t) => removeTemplateActivity(t, 'm-release')),
+    ).toThrow(TemplateEditError)
+    expect(store.getState().templateDrafts.masterplan).toBe(before)
+  })
+
+  it('keeps versions and drafts across a demo reset and in exports', async () => {
+    const { store } = setup('demo')
+    await store.getState().load()
+    store.getState().startTemplateDraft('masterplan')
+    store.getState().publishTemplateDraft('masterplan', '')
+    store.getState().startTemplateDraft('masterplan')
+    store.getState().resetDemo()
+    expect(store.getState().templates.map((t) => t.version)).toEqual([1, 2])
+    expect(store.getState().templateDrafts.masterplan?.version).toBe(3)
+
+    const snapshot = store.getState().exportSnapshot()
+    expect(snapshot.templates?.map((t) => t.version)).toEqual([2])
+    expect(snapshot.templateDrafts?.map((t) => t.version)).toEqual([3])
+    const other = setup()
+    await other.store.getState().load()
+    await other.store.getState().importSnapshot(snapshot)
+    expect(other.store.getState().templates.map((t) => t.version)).toEqual([1, 2])
   })
 })

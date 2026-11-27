@@ -1,22 +1,37 @@
 import { constrainsStart, earliestFinish } from '../engine/constraints'
 import { topologicalOrder } from '../engine/graph'
-import { startOffset, type Template } from '../model/template'
+import { GateSchema, startOffset, type Gate, type Template } from '../model/template'
+
+export type TemplateIssueCode =
+  | 'duplicate-id'
+  | 'unknown-phase'
+  | 'unknown-track'
+  | 'track-phase-mismatch'
+  | 'unknown-predecessor'
+  | 'self-dependency'
+  | 'cycle'
+  | 'dependency-violated'
+  | 'duplicate-gate'
+  | 'release-not-at-zero'
+  | 'milestone-outside-window'
+  | 'before-kickoff'
+  | 'empty-track'
+  | 'orphan'
 
 export interface TemplateIssue {
   severity: 'error' | 'warning'
-  code:
-    | 'duplicate-id'
-    | 'unknown-phase'
-    | 'unknown-track'
-    | 'track-phase-mismatch'
-    | 'unknown-predecessor'
-    | 'self-dependency'
-    | 'cycle'
-    | 'dependency-violated'
-    | 'milestone-outside-window'
-    | 'orphan'
+  code: TemplateIssueCode
+  /** English, for logs and tests. The editor builds its own Danish text from the fields below. */
   message: string
   activityId?: string
+  /** The other activity involved (the predecessor of a violated dependency). */
+  relatedId?: string
+  trackId?: string
+  /** The ids on a dependency cycle, in precedence order and closed. */
+  cycle?: string[]
+  gate?: Gate
+  /** dependency-violated: how many working days short. */
+  workdays?: number
 }
 
 /** How far (in working days) a milestone may sit outside its phase's nominal window. */
@@ -28,10 +43,23 @@ export const MILESTONE_WINDOW_TOLERANCE = 5
  */
 export function validateTemplate(t: Template): TemplateIssue[] {
   const issues: TemplateIssue[] = []
-  const err = (code: TemplateIssue['code'], message: string, activityId?: string) =>
-    issues.push({ severity: 'error', code, message, ...(activityId ? { activityId } : {}) })
-  const warn = (code: TemplateIssue['code'], message: string, activityId?: string) =>
-    issues.push({ severity: 'warning', code, message, ...(activityId ? { activityId } : {}) })
+  type Extra = Omit<TemplateIssue, 'severity' | 'code' | 'message' | 'activityId'>
+  const err = (code: TemplateIssueCode, message: string, activityId?: string, extra?: Extra) =>
+    issues.push({
+      severity: 'error',
+      code,
+      message,
+      ...(activityId ? { activityId } : {}),
+      ...extra,
+    })
+  const warn = (code: TemplateIssueCode, message: string, activityId?: string, extra?: Extra) =>
+    issues.push({
+      severity: 'warning',
+      code,
+      message,
+      ...(activityId ? { activityId } : {}),
+      ...extra,
+    })
 
   // Unique ids across all entity types.
   const seen = new Set<string>()
@@ -49,7 +77,10 @@ export function validateTemplate(t: Template): TemplateIssue[] {
   const activities = new Map(t.activities.map((a) => [a.id, a]))
 
   for (const tr of t.tracks) {
-    if (!phases.has(tr.phaseId)) err('unknown-phase', `Track "${tr.id}" has unknown phase`)
+    if (!phases.has(tr.phaseId))
+      err('unknown-phase', `Track "${tr.id}" has unknown phase`, undefined, { trackId: tr.id })
+    else if (!t.activities.some((a) => a.trackId === tr.id))
+      warn('empty-track', `Track "${tr.id}" has no activities`, undefined, { trackId: tr.id })
   }
 
   for (const a of t.activities) {
@@ -63,12 +94,17 @@ export function validateTemplate(t: Template): TemplateIssue[] {
     for (const d of a.predecessors) {
       if (d.activityId === a.id) err('self-dependency', 'Activity depends on itself', a.id)
       else if (!activities.has(d.activityId))
-        err('unknown-predecessor', `Unknown predecessor "${d.activityId}"`, a.id)
+        err('unknown-predecessor', `Unknown predecessor "${d.activityId}"`, a.id, {
+          relatedId: d.activityId,
+        })
     }
   }
 
   const topo = topologicalOrder(t.activities)
-  if (!topo.ok) err('cycle', `Dependency cycle: ${topo.cycle.join(' → ')}`)
+  if (!topo.ok)
+    err('cycle', `Dependency cycle: ${topo.cycle.join(' → ')}`, topo.cycle[0], {
+      cycle: topo.cycle,
+    })
 
   // Default offsets must respect the dependencies.
   for (const a of t.activities) {
@@ -88,9 +124,33 @@ export function validateTemplate(t: Template): TemplateIssue[] {
           'dependency-violated',
           `${d.type} from "${p.id}" violated: ${label} ${actual} < ${actual + short} (short by ${short} workdays)`,
           a.id,
+          { relatedId: p.id, workdays: short },
         )
       }
     }
+  }
+
+  // The engine gives the gates meaning; the release is day 0 by definition. (The editor never
+  // removes a gate milestone, so a missing gate is not checked here.)
+  for (const gate of GateSchema.options) {
+    for (const extra of t.activities.filter((a) => a.gate === gate).slice(1))
+      err('duplicate-gate', `Gate "${gate}" is on more than one milestone`, extra.id, { gate })
+  }
+  const release = t.activities.find((a) => a.gate === 'release')
+  if (release && release.deadlineOffset !== 0)
+    err('release-not-at-zero', 'The release milestone must be at offset 0', release.id)
+
+  // Nothing should start before the kickoff meeting.
+  for (const a of t.activities) {
+    if (startOffset(a) < t.nominalKickoffOffset)
+      warn(
+        'before-kickoff',
+        `Starts ${t.nominalKickoffOffset - startOffset(a)} workdays before the kickoff`,
+        a.id,
+        {
+          workdays: t.nominalKickoffOffset - startOffset(a),
+        },
+      )
   }
 
   // Milestones should sit inside their phase's nominal window.

@@ -3,7 +3,7 @@
  * and the release, at the dates the plan now expects. Done work at its actual dates, open work
  * at its forecast, so slips widen the bands.
  */
-import type { IsoDate, PhaseTemplate, Publication, PublicationHealth } from '@pms/domain'
+import type { IsoDate, PhaseTemplate, Publication, PublicationHealth, Template } from '@pms/domain'
 import { KEY_MILESTONES, templateOf } from '@/lib/publication'
 
 export interface PhaseSpan {
@@ -32,8 +32,11 @@ export interface PortfolioRowData {
   last: IsoDate
 }
 
-export function portfolioRow(pub: Publication, health: PublicationHealth): PortfolioRowData {
-  const template = templateOf(pub)
+export function portfolioRow(
+  pub: Publication,
+  health: PublicationHealth,
+  template: Template = templateOf(pub),
+): PortfolioRowData {
   const f = health.analysis.activities
   const span = (a: Publication['activities'][number]) => {
     const forecast = f.get(a.id)

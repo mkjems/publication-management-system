@@ -15,7 +15,8 @@ Stage A prototype: frontend only, data stored in the browser.
 - Phase 0 (foundations), Phase 1 (scheduling engine), Phase 2 (publications, table view, time
   machine), Phase 3 (interactive Gantt), Phase 4 (delays and replanning) and Phase 5 (progress
   tracking and portfolio) are done.
-- Next: Phase 6, template editor, polish and client validation.
+- Phase 6 (master plan editor, print/PDF, polish) is built; the client test sessions are next
+  ([docs/klienttest.md](docs/klienttest.md)).
 
 ## Getting started
 
@@ -56,7 +57,15 @@ The UI is in Danish.
   _GO / HOLD / NO-GO_ milestone asks for the decision; HOLD pauses the book.
 - The **Historik** tab shows how the milestones' forecasts have moved over time (the slip chart),
   the saved baselines, and the change log with filters.
-- **Masterplan** shows the template itself, read-only.
+- **Udskriv** (top right on a book) opens a print view: the Gantt chart and the table in the
+  PDF's columns, A3 landscape (A4 selectable). Choose "Gem som PDF" in the print dialog for a PDF.
+- **Masterplan** shows the template, with a version picker once there is more than one version.
+  **Redigér masterplanen** opens a draft of the next version: change durations and deadlines
+  inline (dependent activities move along), click an activity to edit everything else
+  (responsibility, dependencies, optional, fixed duration, notes), add or remove activities,
+  tracks and milestones. The problem list shows what does not hold together; publishing is
+  possible when there are no errors. Existing books keep the version they were created from; new
+  books use the latest. The "Faktisk" column shows how long finished tasks actually took.
 
 ### Two datasets
 
@@ -86,7 +95,7 @@ from before Phase 5 lacks funding and roles; reset the demo to get them.
 ### Where data is stored
 
 Everything is stored locally in the browser (IndexedDB, one database per dataset: `pms-demo` and
-`pms-real`). It is not shared between browsers or machines. Use **Eksportér** / **Importér** on
+`pms-real`), including each dataset's own master plan versions. It is not shared between browsers or machines. Use **Eksportér** / **Importér** on
 the Udgivelser page to move a dataset as a JSON file; importing replaces the current dataset.
 Clearing the site data in the browser deletes everything.
 

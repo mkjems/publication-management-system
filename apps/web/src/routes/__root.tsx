@@ -23,12 +23,26 @@ function RootLayout() {
 
   return (
     <TooltipProvider>
+      <a
+        href="#main"
+        className="sr-only z-[70] rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        {da.skipToContent}
+      </a>
       <div className="flex min-h-svh">
         <AppSidebar />
         <div className="@container min-w-0 flex-1">
           <MobileNav />
-          <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
-            {status === 'ready' && <TimeMachine />}
+          <main
+            id="main"
+            tabIndex={-1}
+            className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8 print:max-w-none print:p-0 outline-none"
+          >
+            {status === 'ready' && (
+              <div className="print:hidden">
+                <TimeMachine />
+              </div>
+            )}
             {status === 'error' && (
               <div className="mb-6 flex gap-3 rounded-lg border border-status-late/40 bg-status-late/10 px-4 py-3 text-sm">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-late" />

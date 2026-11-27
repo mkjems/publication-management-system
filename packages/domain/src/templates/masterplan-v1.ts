@@ -15,7 +15,8 @@
  *   point(id, name, responsible, deadline, predecessors?, opts?)      deadline only
  *   milestone(id, name, responsible, deadline, predecessors, opts?)   phase gate
  *
- * A predecessor given as a plain id is finish-to-start with no lag.
+ * A predecessor given as a plain id is finish-to-start with no lag. Supplier lead times
+ * (printing, transport) are marked `compressible: false`: compression never shortens them.
  */
 import { buildTemplate, milestone, phase, point, task, track } from './builder'
 
@@ -348,9 +349,9 @@ export const MASTERPLAN_V1 = buildTemplate(
           task('technical-fixes', 'Eventuelle tekniske fejl rettes', 'Grafiker', 2, -31, ['proof-review'], { optional: true }),
           point('proof-approved', 'Blåkopi godkendes', 'Redaktør/forlægger', -31, ['technical-fixes']),
           task('colour-proof', 'Eventuel farveprøve godkendes', 'Grafiker + redaktør', 3, -31, [{ id: 'files-uploaded', lag: 1 }], { optional: true }),
-          task('printing', 'Tryk og indbinding', 'Trykker', 12, -18, ['m-print-approval', 'paper-ordered']),
-          task('production-follow-up', 'Produktion følges', 'Projektansvarlig', 12, -18, [{ id: 'printing', type: 'SS' }]),
-          task('transport-follow-up', 'Transport følges', 'Projektansvarlig', 3, -15, ['printing']),
+          task('printing', 'Tryk og indbinding', 'Trykker', 12, -18, ['m-print-approval', 'paper-ordered'], { compressible: false }),
+          task('production-follow-up', 'Produktion følges', 'Projektansvarlig', 12, -18, [{ id: 'printing', type: 'SS' }], { compressible: false }),
+          task('transport-follow-up', 'Transport følges', 'Projektansvarlig', 3, -15, ['printing'], { compressible: false }),
         ]),
         track('p08-press', 'Presse og lancering fortsætter parallelt', [
           task('media-contact', 'Pressearbejde og mediekontakt fortsætter', 'Presseansvarlig', 20, -15, ['first-press-contact']),
@@ -379,7 +380,7 @@ export const MASTERPLAN_V1 = buildTemplate(
       },
       [
         track('p09-delivery', 'Levering, kvalitet og udsendelse', [
-          task('delivery-follow-up', 'Levering følges', 'Projektansvarlig', 2, -13, ['transport-follow-up']),
+          task('delivery-follow-up', 'Levering følges', 'Projektansvarlig', 2, -13, ['transport-follow-up'], { compressible: false }),
           point('books-received', 'Bøger modtages', 'Projektansvarlig/lager', -13, ['delivery-follow-up']),
           task('physical-qc', 'Fysisk kvalitetskontrol', 'Redaktør + grafiker/projektansvarlig', 2, -11, ['books-received']),
           task('complaints', 'Eventuelle reklamationer', 'Projektansvarlig', 5, -6, ['physical-qc'], { optional: true }),

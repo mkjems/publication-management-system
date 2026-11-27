@@ -101,6 +101,17 @@ describe('previewReschedule: compress', () => {
     expect(impact.release.slipWorkdays).toBe(3)
   })
 
+  it('never shortens work marked as not compressible', () => {
+    const fixed = patch(base, 'c', { compressible: false })
+    const impact = previewReschedule(
+      fixed,
+      { kind: 'delay', activityId: 'b', workdays: 16 },
+      { strategy: 'compress' },
+    )
+    expect(impact.compressed).toEqual([])
+    expect(impact.release.slipWorkdays).toBe(1)
+  })
+
   it('accepts explicit durations', () => {
     const impact = previewReschedule(
       base,

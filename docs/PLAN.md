@@ -1,6 +1,6 @@
 # Publishing Management System — Development Plan
 
-Status: draft v7 · 2026-11-26 (Phases 1–5 done; see §9 for findings)
+Status: draft v8 · 2026-11-26 (Phases 1–5 done, Phase 6 built; client sessions pending; see §9)
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
@@ -529,6 +529,56 @@ Decisions made while building it:
 - Accessibility pass, empty states, onboarding hints, performance check.
 - Client test sessions with real upcoming titles. Feedback goes into the backlog for Stage B.
 
+Decisions made while building it:
+
+- **Versions are per workspace.** Version 1 is built in; a workspace's own versions and its
+  draft are stored next to its books (IndexedDB keys `template:<id>@<n>` and `draft:<id>`) and
+  travel with export/import. Demo resets and time travel keep them. Published versions never
+  change; books keep the version they were generated from, and the wizard offers the latest by
+  default. There is one master plan (`masterplan`); several templates per book type would be a
+  small step (§8 question 2).
+- **One draft at a time, edited through pure functions** (`templates/edit.ts`) that refuse
+  invalid edits with a coded `TemplateEditError`. The editor keeps an in-memory undo stack.
+  Publishing requires a validator with no errors; warnings (an activity without predecessors, a
+  milestone outside its phase window, work before the kickoff) are shown but allowed.
+- **Schedule edits move neighbours, minimally.** Changing a duration or deadline pushes
+  successors later and pulls predecessors earlier, each only as far as a dependency requires
+  (`fitTemplateAround`). Adding a dependency moves the successor. The release stays on day 0;
+  a change that would push it is left as an error to resolve. Removing an activity drops the
+  dependencies on it without moving anything. Gate milestones cannot be removed or change kind.
+- **`compressible` flag** (the Phase 2 finding): tasks can be marked "fast varighed"; the compress
+  strategy never shortens them. Version 1 marks printing, production follow-up, transport and
+  delivery.
+- **"Faktisk" column:** the median actual duration of finished tasks in the workspace, by template
+  activity (`actualDurations`), shown next to the template duration and highlighted when they
+  differ by 3+ days. This is the PDF's "Erfaringer føres tilbage i masterplanen".
+- **Version comparison** (`compareTemplates`) lists added, removed and changed phases, tracks and
+  activities with the fields that changed. It is shown in the publish dialog and per version on
+  the Masterplan page. Real edits are listed first; activities that only moved to keep the
+  dependencies are folded into one line ("29 aktiviteter flyttet"), since one longer task can
+  move a whole upstream chain.
+- **Print uses the browser.** `/publications/<id>/print` renders a static Gantt (percent-based,
+  one block per phase with its own month axis, kept on one page where possible) and the table
+  in the PDF's columns, with the header repeating on each page. `@page` sets A3 landscape (A4
+  selectable); "Gem som PDF" in the print dialog makes the PDF, and the page title becomes its
+  file name. No PDF library.
+- **Refused commands are explained in Danish.** `CommandError` now carries a code (like
+  `TemplateEditError`); `lib/errors.ts` maps both to `da.ts`, so English engine messages no longer
+  reach the UI.
+- **Onboarding:** an empty workspace shows a three-step start (review the master plan, create a
+  book, try the demo); three first-visit hints (demo, a book's page, the master plan) can be
+  dismissed and stay dismissed in that browser.
+- **Error page:** a page that fails to render shows a Danish error inside the layout (the
+  router's `defaultErrorComponent`), with "Prøv igen" and a way back to the overview.
+- **Accessibility:** a skip link, a page title per page, labelled icon buttons and form controls
+  (checked across the app), print-friendly colours.
+- **Performance:** with 20 books (3,580 activities, 15 of them on the stress policy) the health
+  of the whole portfolio takes ~13 ms, a week of time travel ~11 ms, and the slip chart of the
+  busiest book (300 events) ~28 ms. The engine is not a bottleneck; React rendering of large
+  charts was not profiled.
+- **Client sessions** are prepared in [klienttest.md](klienttest.md) (Danish): programme, open
+  questions, a note sheet and a backlog split into Stage A fixes and Stage B.
+
 ---
 
 ## 7. Preparing for Stage B (backend) from day one
@@ -640,4 +690,19 @@ Found while building Phase 5:
 - The funding gate is enforced; §8 question 6 (how detailed funding tracking should be) is still
   open. Amounts are DKK only.
 
-Next: Phase 6, template editor, polish and client validation.
+Phase 6 is built: the master plan editor with versions, print/PDF export, Danish error messages,
+onboarding and empty states, an accessibility pass and a performance check. What remains is the
+client test sessions themselves ([klienttest.md](klienttest.md)).
+
+Found while building Phase 6:
+
+- Editing offsets in working days relative to release is exact but abstract; the editor shows
+  "N uger før" next to every number. The client may prefer to edit in weeks.
+- Removing an activity leaves its successors without that predecessor (they keep their dates).
+  Bridging them to the removed activity's predecessors was considered but changes the meaning of
+  the network silently, so the validator's "no predecessors" warning is shown instead.
+- Not done: Playwright end-to-end tests (still no Playwright setup); the editor and print view
+  are covered by component tests in jsdom.
+
+Next: client test sessions with real titles, then Stage B (§7) with the backlog from the
+sessions.

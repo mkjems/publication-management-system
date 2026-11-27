@@ -48,6 +48,8 @@ export const ActivitySchema = z
     /** A fixed date (event venue, printer slot). Rescheduling never moves it. */
     pinned: z.boolean(),
     optional: z.boolean(),
+    /** false: the compress strategy never shortens it (printing, transport). Absent = true. */
+    compressible: z.boolean().optional(),
     gate: GateSchema.nullable(),
     note: z.string(),
     predecessors: z.array(DependencySchema),

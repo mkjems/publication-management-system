@@ -71,6 +71,11 @@ interface Opts {
   note?: string
 }
 
+interface TaskOpts extends Opts {
+  /** false for supplier lead times that cannot be shortened (printing, transport). */
+  compressible?: boolean
+}
+
 type ActivityDraft = Omit<ActivityTemplate, 'phaseId' | 'trackId'>
 
 /** A task with a real work period. `deadline` is in working days relative to release. */
@@ -81,7 +86,7 @@ export function task(
   durationWorkdays: number,
   deadline: number,
   after: Pred[] = [],
-  opts: Opts = {},
+  opts: TaskOpts = {},
 ): ActivityDraft {
   return {
     id,
@@ -92,6 +97,7 @@ export function task(
     deadlineOffset: deadline,
     predecessors: after.map(toDependency),
     optional: opts.optional ?? false,
+    ...(opts.compressible === false ? { compressible: false } : {}),
     ...(opts.note ? { note: opts.note } : {}),
   }
 }

@@ -1,5 +1,6 @@
 import type { CommandContext, CommandResult, Publication } from '@pms/domain'
 import { useCallback } from 'react'
+import { errorText } from '@/lib/errors'
 import { useWorkspace } from '@/store'
 import { useFlash } from '@/store/flash'
 
@@ -13,7 +14,7 @@ export function useCommand(publicationId: string) {
         execute(publicationId, command)
         return true
       } catch (e) {
-        show(e instanceof Error ? e.message : String(e))
+        show(errorText(e))
         return false
       }
     },

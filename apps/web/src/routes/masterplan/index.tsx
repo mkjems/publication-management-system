@@ -1,45 +1,68 @@
-import { MASTERPLAN_V1, ROLE_IDS, ROLE_LABELS, type RoleId } from '@pms/domain'
+import {
+  MASTERPLAN_V1,
+  ROLE_IDS,
+  ROLE_LABELS,
+  findTemplate,
+  latestTemplate,
+  templateVersions,
+  type RoleId,
+} from '@pms/domain'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ChevronsDownUp, ChevronsUpDown, Search, TriangleAlert } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, Pencil, Search, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { groupTemplate } from '@/components/masterplan/group-template'
 import { PhaseSection } from '@/components/masterplan/phase-section'
+import { Hint } from '@/components/onboarding'
 import { PhaseTimeline } from '@/components/masterplan/phase-timeline'
+import { VersionList } from '@/components/masterplan/version-list'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { da } from '@/i18n/da'
+import { useWorkspace } from '@/store'
 
 interface MasterplanSearch {
   q?: string
   role?: RoleId
+  version?: number
 }
 
-export const Route = createFileRoute('/masterplan')({
+export const Route = createFileRoute('/masterplan/')({
   validateSearch: (search: Record<string, unknown>): MasterplanSearch => ({
     ...(typeof search.q === 'string' && search.q ? { q: search.q } : {}),
     ...(typeof search.role === 'string' && (ROLE_IDS as readonly string[]).includes(search.role)
       ? { role: search.role as RoleId }
       : {}),
+    ...(Number.isInteger(Number(search.version)) && Number(search.version) > 0
+      ? { version: Number(search.version) }
+      : {}),
   }),
   component: MasterplanPage,
 })
 
-const template = MASTERPLAN_V1
-const activityById = new Map(template.activities.map((a) => [a.id, a]))
-const usedRoles = ROLE_IDS.filter((r) =>
-  template.activities.some((a) => a.responsible.roles.includes(r)),
-)
+const TEMPLATE_ID = MASTERPLAN_V1.id
 
 function MasterplanPage() {
-  const { q, role } = Route.useSearch()
+  const { q, role, version } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
+  const templates = useWorkspace((s) => s.templates)
+  const draft = useWorkspace((s) => s.templateDrafts[TEMPLATE_ID])
+  const startDraft = useWorkspace((s) => s.startTemplateDraft)
+  const versions = useMemo(() => templateVersions(templates, TEMPLATE_ID), [templates])
+  const latest = latestTemplate(templates, TEMPLATE_ID) ?? MASTERPLAN_V1
+  const template = (version && findTemplate(templates, TEMPLATE_ID, version)) || latest
+  const activityById = useMemo(() => new Map(template.activities.map((a) => [a.id, a])), [template])
+  const usedRoles = useMemo(
+    () => ROLE_IDS.filter((r) => template.activities.some((a) => a.responsible.roles.includes(r))),
+    [template],
+  )
   const [open, setOpen] = useState<Set<string>>(() => new Set())
   const [focusedId, setFocusedId] = useState<string | null>(null)
 
   const filtering = Boolean(q || role)
-  const groups = useMemo(() => groupTemplate(template, { query: q, role }), [q, role])
+  const groups = useMemo(() => groupTemplate(template, { query: q, role }), [template, q, role])
   const isOpen = (phaseId: string) => filtering || open.has(phaseId)
 
   const counts = useMemo(
@@ -47,7 +70,7 @@ function MasterplanPage() {
       activities: template.activities.filter((a) => a.kind !== 'milestone').length,
       milestones: template.activities.filter((a) => a.kind === 'milestone').length,
     }),
-    [],
+    [template],
   )
 
   // Scroll to an activity when a dependency chip is clicked, and flash it.
@@ -63,7 +86,7 @@ function MasterplanPage() {
   function focusActivity(id: string) {
     const target = activityById.get(id)
     if (!target) return
-    if (filtering) void navigate({ search: {} })
+    if (filtering) void navigate({ search: (s) => ({ version: s.version }) })
     setOpen((s) => new Set(s).add(target.phaseId))
     setFocusedId(id)
   }
@@ -76,6 +99,11 @@ function MasterplanPage() {
   }
 
   const allOpen = groups.every((g) => isOpen(g.phase.id))
+  const showVersion = (v: number) =>
+    void navigate({
+      search: (s) => ({ ...s, version: v === latest.version ? undefined : v }),
+      replace: true,
+    })
 
   return (
     <>
@@ -88,12 +116,45 @@ function MasterplanPage() {
             {counts.milestones} {da.masterplan.milestones}
           </>
         }
+        actions={
+          <>
+            {versions.length > 1 && (
+              <NativeSelect
+                value={template.version}
+                onChange={(e) => showVersion(Number(e.target.value))}
+                aria-label={da.masterplan.version}
+              >
+                {versions.map((v) => (
+                  <option key={v.version} value={v.version}>
+                    {da.masterplan.versionOf(v.version)}
+                    {v.version === latest.version ? ` (${da.masterplan.latest.toLowerCase()})` : ''}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+            <Button
+              onClick={() => {
+                startDraft(TEMPLATE_ID)
+                void navigate({ to: '/masterplan/edit' })
+              }}
+            >
+              <Pencil />
+              {draft ? da.masterplan.continueDraft(draft.version) : da.masterplan.edit}
+            </Button>
+          </>
+        }
       />
+
+      <Hint id="masterplan">{da.onboarding.hints.masterplan}</Hint>
 
       <div className="mb-6 flex gap-3 rounded-lg border border-status-waiting/50 bg-status-waiting/10 px-4 py-3 text-sm">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-waiting" />
         <p>{da.masterplan.defaultsNotice}</p>
       </div>
+
+      {versions.length > 1 && (
+        <VersionList versions={versions} shown={template.version} onShow={showVersion} />
+      )}
 
       <Card className="mb-8">
         <CardHeader>
@@ -121,7 +182,7 @@ function MasterplanPage() {
             aria-label={da.masterplan.search}
           />
         </div>
-        <select
+        <NativeSelect
           value={role ?? ''}
           onChange={(e) =>
             void navigate({
@@ -129,7 +190,6 @@ function MasterplanPage() {
               replace: true,
             })
           }
-          className="h-9 rounded-md border border-input bg-card px-3 text-sm shadow-xs"
           aria-label={da.masterplan.allRoles}
         >
           <option value="">{da.masterplan.allRoles}</option>
@@ -138,7 +198,7 @@ function MasterplanPage() {
               {ROLE_LABELS[r]}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         {!filtering && (
           <Button
             variant="outline"

@@ -136,3 +136,15 @@
     font-feature-settings: 'cv11', 'ss01';
   }
 }
+
+/* Printing (the print view of a publication). Colours are part of the information. */
+@media print {
+  html,
+  body {
+    background: white;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -93,6 +93,9 @@ Det er værd at drøfte:
    finansieringsopfølgning løber ved siden af hovedkæden. Systemet advarer, hvis de skrider, men
    de flytter ikke udgivelsesdatoen af sig selv.
 7. **Lanceringsarrangementet ligger dagen efter udgivelsen** (+1) som standard.
+8. **Leverandørtider har fast varighed.** Tryk og indbinding, produktion, transport og levering
+   er markeret "fast varighed": når en forsinkelse skal indhentes ved at komprimere planen,
+   forkortes de aldrig. Andre opgaver forkortes højst til det halve.
 
 ## Spørgsmål til forlaget
 
@@ -111,8 +114,11 @@ Det er værd at drøfte:
 
 ## Næste skridt
 
-Rettelser til varigheder og afhængigheder skrives direkte i
-[masterplan-v1.ts](../packages/domain/src/templates/masterplan-v1.ts). Testene kontrollerer
-automatisk, at planen stadig hænger sammen (ingen cirkulære afhængigheder, ingen aktivitet starter
-før sine forgængere, milepæle inden for faservinduerne). Senere (fase 6) kan masterplanen redigeres
-direkte i appen.
+Masterplanen kan nu redigeres direkte i appen (**Masterplan → Redigér masterplanen**). Ændringerne
+samles i en kladde og udgives som en ny version; eksisterende bøger beholder den version, de blev
+oprettet fra. Editoren flytter afhængige aktiviteter med, når en varighed eller deadline ændres,
+og viser løbende, hvad der ikke hænger sammen (cirkulære afhængigheder, aktiviteter der starter
+før deres forgængere, milepæle uden for faservinduet). Kolonnen **Faktisk** viser, hvor lang tid
+færdige opgaver reelt har taget i datasættet, så erfaringerne kan føres tilbage i masterplanen.
+
+Gennemgangen med forlaget er beskrevet i [klienttest.md](klienttest.md).

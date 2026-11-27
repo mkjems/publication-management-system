@@ -13,7 +13,7 @@ export function FlashBanner() {
   return (
     <div
       role="alert"
-      className="fixed right-4 bottom-4 z-[60] flex max-w-md items-start gap-3 rounded-lg border border-status-late/40 bg-card px-4 py-3 text-sm shadow-lg"
+      className="fixed right-4 bottom-4 z-[60] flex print:hidden max-w-md items-start gap-3 rounded-lg border border-status-late/40 bg-card px-4 py-3 text-sm shadow-lg"
     >
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-late" />
       <p className="flex-1">{message}</p>

@@ -30,8 +30,39 @@ import {
 import type { CommandContext } from './context'
 import { Transaction, type ChangeMeta, type CommandResult } from './transaction'
 
+export type CommandErrorCode =
+  | 'unknown'
+  | 'reason-required'
+  | 'no-release'
+  | 'pinned-conflict'
+  | 'waiting-needs-text'
+  | 'finish-before-start'
+  | 'funding-insufficient'
+  | 'not-optional'
+  | 'not-a-gate'
+  | 'already-decided'
+  | 'publication-finished'
+  | 'already-binding'
+  | 'not-binding'
+  | 'already-paused'
+  | 'not-paused'
+  | 'resume-before-pause'
+  | 'self-dependency'
+  | 'duplicate-dependency'
+  | 'cycle'
+  | 'negative-amount'
+  | 'funder-required'
+  | 'decision-before-submission'
+
+/**
+ * A command was refused. `code` says why, for the UI's own wording; the message is English, for
+ * logs and tests.
+ */
 export class CommandError extends Error {
-  constructor(message: string) {
+  constructor(
+    readonly code: CommandErrorCode,
+    message: string,
+  ) {
     super(message)
     this.name = 'CommandError'
   }
@@ -56,7 +87,7 @@ export function reschedule(
   assertNoConflicts(impact.pinnedConflicts, meta)
   const releaseMoves = impact.release.newTarget !== impact.release.target
   if (releaseMoves && pub.planState === 'binding' && !meta.reason) {
-    throw new CommandError('A reason is required to move a binding release date')
+    throw new CommandError('reason-required', 'A reason is required to move a binding release date')
   }
 
   const tx = new Transaction(ctx, pub)
@@ -92,9 +123,9 @@ export function changeReleaseDate(
 ): CommandResult & { pinnedConflicts: PinnedConflict[] } {
   const cal = getCalendar(pub.calendar)
   const release = releaseActivity(pub)
-  if (!release) throw new CommandError('The plan has no release milestone')
+  if (!release) throw new CommandError('no-release', 'The plan has no release milestone')
   if (pub.planState === 'binding' && !meta.reason) {
-    throw new CommandError('A reason is required to move a binding release date')
+    throw new CommandError('reason-required', 'A reason is required to move a binding release date')
   }
   const delta = cal.ordinal(releaseDate) - cal.ordinal(release.deadline)
   const shifted = shiftPlan(pub, { deltaWorkdays: delta, from: ctx.asOf, notBefore: ctx.asOf })
@@ -114,6 +145,7 @@ export function changeReleaseDate(
 function assertNoConflicts(conflicts: PinnedConflict[], meta: RescheduleMeta) {
   if (conflicts.length && !meta.acceptConflicts) {
     throw new CommandError(
+      'pinned-conflict',
       `Pinned activities would be in conflict: ${conflicts.map((c) => c.activityId).join(', ')}`,
     )
   }
@@ -173,22 +205,25 @@ export function setStatus(
       }
       break
     case 'waiting':
-      if (!options.waitingFor) throw new CommandError('"waiting" needs a waitingFor')
+      if (!options.waitingFor)
+        throw new CommandError('waiting-needs-text', '"waiting" needs a waitingFor')
       next = { ...a, status, actualFinish: null, waitingFor: options.waitingFor }
       break
     case 'done':
       if (a.actualStart && a.actualStart > on) {
-        throw new CommandError('An activity cannot finish before it started')
+        throw new CommandError('finish-before-start', 'An activity cannot finish before it started')
       }
       if (a.gate === 'funding_secured' && !isFundingSufficient(pub)) {
         throw new CommandError(
+          'funding-insufficient',
           'The funding gate needs the minimum funding secured or the risk accepted',
         )
       }
       next = { ...a, status, actualFinish: on, waitingFor: null }
       break
     case 'skipped':
-      if (!a.optional) throw new CommandError('Only optional activities can be skipped')
+      if (!a.optional)
+        throw new CommandError('not-optional', 'Only optional activities can be skipped')
       next = { ...a, status, actualStart: null, actualFinish: null, waitingFor: null }
       break
   }
@@ -227,12 +262,18 @@ export function decideGate(
   meta: ChangeMeta = {},
 ): CommandResult {
   const a = findActivity(pub, activityId)
-  if (a.gate !== 'go_hold_nogo') throw new CommandError('Not a GO / HOLD / NO-GO gate')
-  if (a.status === 'done') throw new CommandError('The decision has already been made')
+  if (a.gate !== 'go_hold_nogo')
+    throw new CommandError('not-a-gate', 'Not a GO / HOLD / NO-GO gate')
+  if (a.status === 'done')
+    throw new CommandError('already-decided', 'The decision has already been made')
   if (['released', 'closed', 'no_go'].includes(pub.lifecycle)) {
-    throw new CommandError(`A ${pub.lifecycle} publication cannot change its decision`)
+    throw new CommandError(
+      'publication-finished',
+      `A ${pub.lifecycle} publication cannot change its decision`,
+    )
   }
-  if (decision !== 'go' && !meta.reason) throw new CommandError('HOLD and NO-GO need a reason')
+  if (decision !== 'go' && !meta.reason)
+    throw new CommandError('reason-required', 'HOLD and NO-GO need a reason')
 
   const tx = new Transaction(ctx, pub)
   const held = openPause(pub)
@@ -340,7 +381,8 @@ export function makeBinding(
 
 function makeBindingStep(tx: Transaction, reason: string, meta: ChangeMeta = {}) {
   const pub = tx.publication
-  if (pub.planState === 'binding') throw new CommandError('The plan is already binding')
+  if (pub.planState === 'binding')
+    throw new CommandError('already-binding', 'The plan is already binding')
   const bindingReleaseDate = releaseActivity(pub)?.deadline ?? pub.desiredReleaseDate
   const baseline = snapshot(pub, tx.context.asOf, reason, bindingReleaseDate)
   tx.record(
@@ -358,7 +400,8 @@ function makeBindingStep(tx: Transaction, reason: string, meta: ChangeMeta = {})
 
 /** Captures the current plan as a new baseline. Earlier baselines are kept. */
 export function rebaseline(pub: Publication, ctx: CommandContext, reason: string): CommandResult {
-  if (pub.planState !== 'binding') throw new CommandError('Only a binding plan has baselines')
+  if (pub.planState !== 'binding')
+    throw new CommandError('not-binding', 'Only a binding plan has baselines')
   const tx = new Transaction(ctx, pub)
   rebaselineStep(tx, reason)
   return tx.result()
@@ -394,9 +437,12 @@ export function pause(
   ctx: CommandContext,
   options: { reason: string; from?: IsoDate } & ChangeMeta,
 ): CommandResult {
-  if (openPause(pub)) throw new CommandError('The publication is already paused')
+  if (openPause(pub)) throw new CommandError('already-paused', 'The publication is already paused')
   if (['released', 'closed', 'no_go'].includes(pub.lifecycle)) {
-    throw new CommandError(`A ${pub.lifecycle} publication cannot be paused`)
+    throw new CommandError(
+      'publication-finished',
+      `A ${pub.lifecycle} publication cannot be paused`,
+    )
   }
   const from = options.from ?? ctx.asOf
   const tx = new Transaction(ctx, pub)
@@ -432,9 +478,10 @@ export function resume(
   options: { mode: ResumeMode; on?: IsoDate } & RescheduleMeta,
 ): CommandResult & { pinnedConflicts: PinnedConflict[] } {
   const current = openPause(pub)
-  if (!current) throw new CommandError('The publication is not paused')
+  if (!current) throw new CommandError('not-paused', 'The publication is not paused')
   const on = options.on ?? ctx.asOf
-  if (on < current.from) throw new CommandError('Cannot resume before the pause started')
+  if (on < current.from)
+    throw new CommandError('resume-before-pause', 'Cannot resume before the pause started')
   const cal = getCalendar(pub.calendar)
   const release = releaseActivity(pub)
 
@@ -520,15 +567,15 @@ export function addDependency(
   const a = findActivity(pub, activityId)
   findActivity(pub, dependency.activityId)
   if (dependency.activityId === activityId)
-    throw new CommandError('An activity cannot depend on itself')
+    throw new CommandError('self-dependency', 'An activity cannot depend on itself')
   if (a.predecessors.some((d) => d.activityId === dependency.activityId)) {
-    throw new CommandError('The dependency already exists')
+    throw new CommandError('duplicate-dependency', 'The dependency already exists')
   }
   const next = replaceActivity(pub, { ...a, predecessors: [...a.predecessors, dependency] })
   const topo = topologicalOrder(next.activities)
   if (!topo.ok) {
     const names = topo.cycle.map((id) => findActivity(pub, id).name)
-    throw new CommandError(`The dependency would create a cycle: ${names.join(' → ')}`)
+    throw new CommandError('cycle', `The dependency would create a cycle: ${names.join(' → ')}`)
   }
   const tx = new Transaction(ctx, pub)
   tx.record('dependency_added', next, { activityId, dependency })
@@ -543,7 +590,7 @@ export function removeDependency(
 ): CommandResult {
   const a = findActivity(pub, activityId)
   const dependency = a.predecessors.find((d) => d.activityId === predecessorId)
-  if (!dependency) throw new CommandError('No such dependency')
+  if (!dependency) throw new CommandError('unknown', 'No such dependency')
   const tx = new Transaction(ctx, pub)
   tx.record(
     'dependency_removed',

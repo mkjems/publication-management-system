@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { useCommand } from '@/hooks/use-command'
+import { useTemplateOf } from '@/hooks/use-publication'
 import { EVENT_LABELS, HEALTH_REASON_LABELS, PUSH_REASON_LABELS, da } from '@/i18n/da'
 import {
   formatDate,
@@ -28,7 +29,7 @@ import {
   formatDuration,
   formatWorkdays,
 } from '@/lib/format'
-import { baselineDeadline, describeEvent, eventAuthor, templateOf } from '@/lib/publication'
+import { baselineDeadline, describeEvent, eventAuthor } from '@/lib/publication'
 import { StatusSelect } from './status-select'
 
 /** Side panel with everything about one activity (PLAN §5.1.4). */
@@ -49,11 +50,11 @@ export function ActivityPanel({
 }) {
   const pub = record.publication
   const run = useCommand(pub.id)
+  const template = useTemplateOf(pub)
   const a = pub.activities.find((x) => x.id === activityId)
   if (!a) return null
   const h = health.activities.get(a.id)!
   const f = health.analysis.activities.get(a.id)!
-  const template = templateOf(pub)
   const phase = template.phases.find((p) => p.id === a.phaseId)
   const track = template.tracks.find((t) => t.id === a.trackId)
   const byId = new Map(pub.activities.map((x) => [x.id, x]))

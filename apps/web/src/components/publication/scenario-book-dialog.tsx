@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { da } from '@/i18n/da'
+import { errorText } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/store'
 import { useFlash } from '@/store/flash'
@@ -56,7 +57,7 @@ export function ScenarioBookDialog({ onOpenChange }: { onOpenChange: (open: bool
         void navigate({ to: '/' })
       }
     } catch (err) {
-      show(err instanceof Error ? err.message : String(err))
+      show(errorText(err))
     }
   }
 

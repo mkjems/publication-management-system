@@ -29,6 +29,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { useCommand } from '@/hooks/use-command'
 import { REASON_CATEGORY_LABELS, STRATEGY_LABELS, da } from '@/i18n/da'
+import { errorText } from '@/lib/errors'
 import { formatDate, formatDateCompact } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { DateWithWorkdays } from './plan-dialogs'
@@ -82,7 +83,7 @@ export function ImpactDialog({
     try {
       return { impact: previewReschedule(pub, change, { strategy }) }
     } catch (e) {
-      return { error: e instanceof Error ? e.message : String(e) }
+      return { error: errorText(e) }
     }
   }, [pub, change, strategy])
 

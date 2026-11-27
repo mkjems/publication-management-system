@@ -7,6 +7,7 @@ import type { History } from '../commands/history'
 import { IsoDateSchema } from '../model/common'
 import { ChangeEventSchema } from '../model/events'
 import { PersonSchema, PublicationSchema } from '../model/publication'
+import { TemplateSchema } from '../model/template'
 import type { ScriptAction, SimulationSetup } from '../simulation/scenario'
 import type { SimulationPolicy } from '../simulation/simulate'
 
@@ -60,6 +61,10 @@ export const WorkspaceSnapshotSchema = z.object({
   simulatedDate: IsoDateSchema.nullable(),
   people: z.array(PersonSchema),
   publications: z.array(PublicationRecordSchema),
+  /** Master plan versions published in this workspace (built-in versions are not included). */
+  templates: z.array(TemplateSchema).optional(),
+  /** Unpublished drafts, at most one per template. */
+  templateDrafts: z.array(TemplateSchema).optional(),
 })
 export type WorkspaceSnapshot = z.infer<typeof WorkspaceSnapshotSchema>
 

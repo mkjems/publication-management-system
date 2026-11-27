@@ -11,6 +11,15 @@ import { selectRecord } from '@/store/workspace-store'
 import { GateDialog } from './gate-dialog'
 import { WaitingDialog } from './waiting-dialog'
 
+/** Tint per status, so a column of statuses can be scanned at a glance. */
+const TONE: Record<ActivityStatus, string> = {
+  not_started: 'border-muted-foreground/30 bg-muted',
+  in_progress: 'border-status-active/50 bg-status-active/10',
+  waiting: 'border-status-late/50 bg-status-late/10 text-status-late font-medium',
+  done: 'border-status-done/50 bg-status-done/15',
+  skipped: 'bg-muted text-muted-foreground',
+}
+
 /**
  * Inline status editor. Choosing "Afventer" asks what the activity is waiting for; completing
  * the GO / HOLD / NO-GO gate asks for the decision; the funding gate explains what is missing.
@@ -45,7 +54,7 @@ export function StatusSelect({
         aria-label={`${da.publication.columns.status}: ${a.name}`}
         value={a.status}
         onChange={(e) => change(e.target.value as ActivityStatus)}
-        className={cn('h-8 w-full text-xs', className)}
+        className={cn('h-8 w-full text-xs', TONE[a.status], className)}
       >
         {statusOptions(a).map((s) => (
           <option key={s} value={s}>

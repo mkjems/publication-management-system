@@ -37,7 +37,7 @@ import { da } from '@/i18n/da'
 import { formatDependencyType, formatDuration, formatOffset } from '@/lib/format'
 import { issueText, responsibilityFor } from '@/lib/template'
 import { cn } from '@/lib/utils'
-import { KindGlyph } from '../kind-glyph'
+import { KindIcon } from '../kind-icon'
 import { newTemplateId, useEditor } from './context'
 import { NameDialog } from './dialogs'
 import { NumberField } from './number-field'
@@ -321,7 +321,7 @@ function ActivityRow({
       <td className="py-2 pr-3 pl-5">
         <div className="flex items-start gap-2">
           <span className="mt-0.5">
-            <KindGlyph kind={a.kind} optional={a.optional} />
+            <KindIcon kind={a.kind} optional={a.optional} />
           </span>
           <button
             type="button"

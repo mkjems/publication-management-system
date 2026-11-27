@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { da } from '@/i18n/da'
 import { formatDependencyType, formatDuration, formatOffset } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { KindGlyph } from './kind-glyph'
+import { KindIcon } from './kind-icon'
 
 export interface PhaseGroup {
   phase: PhaseTemplate
@@ -53,7 +53,7 @@ export function PhaseSection({
             <span className="mt-2 flex flex-wrap gap-1.5">
               {group.milestones.map((m) => (
                 <Badge key={m.id} variant="milestone">
-                  <KindGlyph kind="milestone" /> {m.name}
+                  <KindIcon kind="milestone" /> {m.name}
                 </Badge>
               ))}
             </span>
@@ -182,7 +182,7 @@ function ActivityRow({
       <td className="py-2 pr-3 pl-5">
         <div className="flex items-start gap-2">
           <span className="mt-0.5">
-            <KindGlyph kind={a.kind} optional={a.optional} />
+            <KindIcon kind={a.kind} optional={a.optional} />
           </span>
           <span className={cn(a.kind === 'milestone' && 'font-medium')}>{a.name}</span>
           {a.optional && <Badge variant="muted">{da.masterplan.optional}</Badge>}

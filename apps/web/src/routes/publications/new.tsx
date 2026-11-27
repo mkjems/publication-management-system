@@ -12,7 +12,7 @@ import {
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { TriangleAlert } from 'lucide-react'
 import { useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { KindGlyph } from '@/components/masterplan/kind-glyph'
+import { KindIcon } from '@/components/masterplan/kind-icon'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -250,7 +250,7 @@ function NewPublicationPage() {
               <ol className="grid gap-1.5 text-sm">
                 {milestones.map((m) => (
                   <li key={m.id} className="flex items-baseline gap-2">
-                    <KindGlyph kind="milestone" />
+                    <KindIcon kind="milestone" />
                     <span className="min-w-0 flex-1">{m.name}</span>
                     <span className="text-muted-foreground tabular-nums">
                       {formatDate(m.deadline)}

@@ -8,7 +8,7 @@ import {
 } from '@pms/domain'
 import { Lock, Route as RouteIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { KindGlyph } from '@/components/masterplan/kind-glyph'
+import { KindIcon } from '@/components/masterplan/kind-icon'
 import { HealthBadge, SlipBadge } from '@/components/status/status'
 import { Button } from '@/components/ui/button'
 import {
@@ -68,7 +68,7 @@ export function ActivityPanel({
         <SheetHeader>
           <SheetTitle className="flex items-start gap-2">
             <span className="mt-0.5">
-              <KindGlyph kind={a.kind} optional={a.optional} />
+              <KindIcon kind={a.kind} optional={a.optional} />
             </span>
             {a.name}
           </SheetTitle>

@@ -30,7 +30,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
-import { KindGlyph } from '@/components/masterplan/kind-glyph'
+import { KindIcon } from '@/components/masterplan/kind-icon'
 import { HealthDot, SlipBadge } from '@/components/status/status'
 import { da } from '@/i18n/da'
 import { formatDate } from '@/lib/format'
@@ -587,7 +587,7 @@ function Row({
         data-activity-id={a.id}
       >
         <HealthDot state={h.state} />
-        <KindGlyph kind={a.kind} optional={a.optional} />
+        <KindIcon kind={a.kind} optional={a.optional} />
         <button
           type="button"
           onClick={() => onOpenActivity(a.id)}

@@ -7,7 +7,7 @@ import {
 } from '@pms/domain'
 import { ChevronRight, Lock, Route as RouteIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { KindGlyph } from '@/components/masterplan/kind-glyph'
+import { KindIcon } from '@/components/masterplan/kind-icon'
 import { HealthDot, ProgressBar, SlipBadge } from '@/components/status/status'
 import { Badge } from '@/components/ui/badge'
 import { useCommand } from '@/hooks/use-command'
@@ -99,7 +99,7 @@ export function PlanTable({
                       <th className="w-40 px-3 py-2 font-medium">
                         {da.publication.columns.deadline}
                       </th>
-                      <th className="w-32 px-3 py-2 font-medium">
+                      <th className="w-36 px-3 py-2 font-medium">
                         {da.publication.columns.status}
                       </th>
                       <th className="w-56 py-2 pr-5 pl-3 font-medium">
@@ -171,7 +171,7 @@ function ActivityRow({
       <td className="py-1.5 pr-3 pl-5">
         <div className="flex items-center gap-2">
           <HealthDot state={h.state} />
-          <KindGlyph kind={a.kind} optional={a.optional} />
+          <KindIcon kind={a.kind} optional={a.optional} />
           <button
             type="button"
             onClick={onOpen}

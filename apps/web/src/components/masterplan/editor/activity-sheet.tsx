@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { da } from '@/i18n/da'
 import { KIND_LABELS, formatDuration, formatOffset } from '@/lib/format'
 import { issueText, responsibilityFor } from '@/lib/template'
-import { KindGlyph } from '../kind-glyph'
+import { KindIcon } from '../kind-icon'
 import { useEditor } from './context'
 import { NumberField } from './number-field'
 
@@ -93,7 +93,7 @@ function ActivityForm({ a }: { a: ActivityTemplate }) {
       <SheetHeader>
         <SheetTitle className="flex items-start gap-2">
           <span className="mt-0.5">
-            <KindGlyph kind={a.kind} optional={a.optional} />
+            <KindIcon kind={a.kind} optional={a.optional} />
           </span>
           {a.name}
         </SheetTitle>

@@ -1,6 +1,6 @@
 import type { Activity, Publication, PublicationHealth } from '@pms/domain'
 import type { ReactNode } from 'react'
-import { KindGlyph } from '@/components/masterplan/kind-glyph'
+import { KindIcon } from '@/components/masterplan/kind-icon'
 import { HEALTH_LABELS, STATUS_LABELS, da } from '@/i18n/da'
 import { formatDateCompact } from '@/lib/format'
 import { baselineDeadline, type PhaseRows } from '@/lib/publication'
@@ -133,7 +133,7 @@ function Row({
       <td className="py-0.5 pr-2">
         <span className="flex items-start gap-1">
           <span className="mt-px scale-75">
-            <KindGlyph kind={a.kind} optional={a.optional} />
+            <KindIcon kind={a.kind} optional={a.optional} />
           </span>
           <span
             className={cn(

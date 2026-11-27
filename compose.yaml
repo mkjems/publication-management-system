@@ -1,0 +1,7 @@
+# Copy of /opt/pms/compose.yaml on the VPS (see ../Infrastructure/docs/deploy-new-app.md).
+services:
+  pms:
+    image: ghcr.io/mkjems/pms:latest
+    ports:
+      - '127.0.0.1:8089:8080'
+    restart: unless-stopped

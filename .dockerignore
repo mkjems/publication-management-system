@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+.playwright-mcp
+.tanstack
+.vite
+.DS_Store
+**/node_modules
+**/dist
+coverage
+Research
+docs
+*.log
+.env
+.env.*

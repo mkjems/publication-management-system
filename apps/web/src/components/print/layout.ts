@@ -1,5 +1,5 @@
 /**
- * Layout for the printed plan (A3 landscape, PLAN §6 Phase 6). Positions are percentages of the
+ * Layout for the printed plan (A3 landscape, PLAN §5.1.12). Positions are percentages of the
  * chart width, so the chart fills whatever paper width the browser prints on.
  */
 import {

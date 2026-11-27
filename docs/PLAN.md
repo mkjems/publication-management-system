@@ -1,708 +1,394 @@
 # Publishing Management System — Development Plan
 
-Status: draft v8 · 2026-11-26 (Phases 1–5 done, Phase 6 built; client sessions pending; see §9)
+Status: v9 · 2026-11-27. Phases 0–6 are done (summarised in §6.1). Phase 7 (§6.2) responds to the
+client's first feedback.
 Source material: [Research/Masterproduktionsplan_bogudgivelser.pdf](../Research/Masterproduktionsplan_bogudgivelser.pdf)
 
 ---
 
 ## 1. What we are building
 
-A planning and tracking tool for book production (bogudgivelser). Every publication starts from the
-**Masterproduktionsplan**: 11 phases, ~25 parallel tracks (spor), ~130 activities and 14 milestones,
-planned backwards from a release date. The system turns that paper template into a live plan per
-publication.
+A planning and tracking tool for book production (bogudgivelser). It turns the publisher's
+**Masterproduktionsplan** (11 phases, ~25 parallel tracks, ~130 activities, 14 milestones,
+planned backwards from a release date) into a live plan per publication. The main view of a
+publication is an **interactive Gantt chart**.
 
-Three goals, in priority order:
+Goals, in priority order:
 
 1. **Handle delays and postponements easily.** When something slips, the user sees at once what it
-   affects (downstream activities, milestones, the release date) and picks how to absorb it.
-2. **Plan production.** Generate a full plan for a new book from the master template and a release
-   date, then adjust it.
-3. **Track progress.** Status per activity, phase and publication; what is late, at risk, or waiting;
-   and how the plan has drifted from the original.
+   affects and picks how to absorb it.
+2. **Plan production.** Generate a plan for a new book from a master plan and a release date, then
+   adapt it to the book.
+3. **Track progress.** Status per activity, phase and publication; what is late, at risk or
+   waiting; how the plan has drifted from the original.
 
-The main view of a publication is an **interactive Gantt chart**.
-
-### Delivery strategy
-
-- **Stage A (now): frontend only.** Full UI with local state saved in the browser. It can be demoed
-  to the client and gathers feedback on the hard parts (scheduling, delay handling, Gantt UX) before
-  any backend exists.
-- **Stage B (later):** database, API, auth and multi-user. Stage A is structured so this is a swap
-  of the persistence layer, not a rewrite (see §7).
+**Delivery:** Stage A (now) is frontend only, with state in the browser (IndexedDB), deployed as a
+demo site for the client. Stage B (§7) adds database, API, auth and multiple users as a swap of
+the persistence layer, not a rewrite.
 
 ---
 
-## 2. What the master plan tells us (domain analysis)
+## 2. What the master plan tells us
 
-| Concept in the PDF                                                                                                                                           | What it means for the system                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Phases** 1–11 (Startmøde → Opfølgning), each with a time window relative to release ("9–6½ mdr. før udgivelse")                                            | Template phases carry default offsets from the release date.                                                                                                                 |
-| **Tracks** within a phase ("Manus og redaktion", "Billeder", "Finansiering løbende spor"…) run in parallel                                                   | Gantt rows are grouped Phase → Track → Activity.                                                                                                                             |
-| **Activity** columns: Aktivitet · Ansvarlig · Start · Oprindelig deadline · Aktuel deadline · Status · Bemærkning/afhængighed                                | Core activity record.                                                                                                                                                        |
-| "Udfyld **Start** kun for aktiviteter med et reelt arbejdsforløb"                                                                                            | Two kinds of activity: **task** (has duration, drawn as a bar) and **deadline** (point in time, drawn as a tick).                                                            |
-| "Bevar altid **Oprindelig deadline**, og brug **Aktuel deadline** ved ændringer"                                                                             | **Baseline vs current** is built in. We never overwrite the original. Every change is logged.                                                                                |
-| **Status**: Ikke startet · I gang · Afventer · Færdig                                                                                                        | Status enum. "Afventer" also records _what_ it waits for.                                                                                                                    |
-| **Ansvarlig**: roles, often combined ("Redaktør + grafiker + opdragsgiver")                                                                                  | Activities reference one or more **roles**. Each publication assigns **people** to roles.                                                                                    |
-| **MILEPÆL** at the end of each phase (GO/HOLD/NO-GO, Manus låst til layout, Trykgodkendelse…)                                                                | Milestones are gates with a date and a decision/approval.                                                                                                                    |
-| **Finansieringsforbehold**: the release date only becomes binding when funding is secured or the risk is accepted; funding can pause or shift the whole plan | Publication has **Ønsket** (desired) and **Bindende** (binding) release dates, a **plan state** (preliminary → binding), funding tracking, and a **pause/resume** operation. |
-| "Hele produktionsplanen beregnes **baglæns**"                                                                                                                | Generate the plan backwards from the release date.                                                                                                                           |
-| "Erfaringer føres tilbage i masterplanen"                                                                                                                    | The template is editable and versioned. Delay history lets us suggest better default durations later.                                                                        |
+| Concept in the PDF                                                                                   | What it means for the system                                                                                            |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Phases** 1–11 (Startmøde → Opfølgning), each with a window relative to release                     | Template phases with offsets from the release date. Phases 1–2 are anchored to the kickoff, phases 3–11 to the release. |
+| **Tracks** within a phase run in parallel                                                            | Gantt rows are grouped Phase → Track → Activity.                                                                        |
+| Columns: Aktivitet · Ansvarlig · Start · Oprindelig deadline · Aktuel deadline · Status · Bemærkning | Core activity record; the plan table mirrors these columns.                                                             |
+| "Udfyld **Start** kun for aktiviteter med et reelt arbejdsforløb"                                    | Activity kinds: **task** (duration, a bar), **deadline** (a point), **milestone** (a gate or marker).                   |
+| "Bevar altid **Oprindelig deadline**, og brug **Aktuel deadline** ved ændringer"                     | Baseline vs current. The original is never overwritten; every change is logged.                                         |
+| **Status**: Ikke startet · I gang · Afventer · Færdig                                                | Status enum, plus `skipped`. "Afventer" records what it waits for.                                                      |
+| **Ansvarlig**: roles, often combined                                                                 | Activities reference roles; each publication assigns people to roles.                                                   |
+| **MILEPÆL** at the end of each phase                                                                 | Milestones; some are gates with a decision (GO/HOLD/NO-GO, funding, production start, release).                         |
+| **Finansieringsforbehold**                                                                           | Desired vs binding release date, plan state (preliminary → binding), funding tracking, pause/resume.                    |
+| "Hele produktionsplanen beregnes **baglæns**"                                                        | Plans are generated backwards from the release date.                                                                    |
+| "Erfaringer føres tilbage i masterplanen"                                                            | Master plans are editable and versioned; actual durations are shown next to the template's.                             |
 
-### Roles found in the PDF
+The PDF gives no durations, dependencies or working calendar. We proposed them
+([masterplan-defaults.md](masterplan-defaults.md), Danish); the client wants them visible and
+editable (§6.2).
 
-Projektansvarlig, Forlægger, Redaktør, Forfatter, Grafiker, Billedansvarlig, Fotograf,
-Korrekturlæser, Registerredaktør, Repro, Trykker, Presseansvarlig, Kommunikation(sansvarlig),
-Salgsansvarlig, Lager, Opdragsgiver, Forlaget (collective), Projektteam (collective).
+**Roles:** Projektansvarlig, Forlægger, Redaktør, Forfatter, Grafiker, Billedansvarlig, Fotograf,
+Korrekturlæser, Registerredaktør, Repro, Trykker, Presseansvarlig, Kommunikation, Salgsansvarlig,
+Lager, Opdragsgiver, Forlaget, Projektteam.
 
-### Milestones (gates)
-
-1. GO / HOLD / NO-GO
-2. Finansiering tilstrækkelig / risiko godkendt
-3. Produktionsstart
-4. Revideret og gennemredigeret manus
-5. Manus låst til layout
-6. Billedmateriale komplet til layout
-7. Principlayout godkendt
-8. 1. ombrud klar
-9. 2. ombrud klar
-10. Bogen lukket
-11. Trykgodkendelse
-12. Færdige bøger godkendt og på lager
-13. Udgivelse
-14. Projekt afsluttet og evalueret
-
-### What the PDF does _not_ give us (we must propose it, then validate it with the client)
-
-- **Durations** per activity (only phase windows are given).
-- **Dependencies** between activities (the "afhængighed" column is empty). We will propose a default
-  network: mostly finish-to-start inside a track, plus cross-track links into milestones (e.g.
-  _Manus låst_ + _Billedmateriale komplet_ → _Samlet materiale afleveres til grafiker_).
-- **Working calendar**: weekends, Danish public holidays, summer and Christmas closures (printers
-  often close in July).
+**Milestones:** GO/HOLD/NO-GO · Finansiering tilstrækkelig / risiko godkendt · Produktionsstart ·
+Revideret og gennemredigeret manus · Manus låst til layout · Billedmateriale komplet til layout ·
+Principlayout godkendt · 1. ombrud klar · 2. ombrud klar · Bogen lukket · Trykgodkendelse ·
+Færdige bøger godkendt og på lager · Udgivelse · Projekt afsluttet og evalueret.
 
 ---
 
 ## 3. Domain model
 
-Plain TypeScript types with Zod schemas. The same schemas are reused by the API in Stage B.
+Zod schemas in `packages/domain/src/model`; the same schemas serve the API in Stage B.
 
 ```
-Template (versioned)
- ├─ PhaseTemplate      { id, number, name, windowStartOffset, windowEndOffset }
- ├─ TrackTemplate      { id, phaseId, name }
- ├─ ActivityTemplate   { id, trackId, name, kind: task|deadline|milestone, roles[],
- │                       defaultDurationWorkdays, defaultOffsetFromRelease,
- │                       predecessors[{ activityId, type: FS|SS|FF, lagWorkdays }],
- │                       optional: boolean }            // "Eventuelt register…", "Eventuel farveprøve…"
- └─ Role               { id, name }
+Template (versioned; id + version)
+ { id, version, name, basedOnVersion?, publishedOn?, changeNote?, nominalKickoffOffset,
+   phases:    [{ id, number, name, period, window: { startOffset, endOffset }, anchor: kickoff|release }],
+   tracks:    [{ id, phaseId, name }],
+   activities:[{ id, phaseId, trackId | null, name, kind: task|deadline|milestone, responsible,
+                 durationWorkdays, deadlineOffset, predecessors[{ activityId, type: FS|SS|FF, lagWorkdays }],
+                 optional, compressible?, gate?, note? }] }
 
-Publication (Stage A keeps activities, baselines and calendar inside the publication)
- { id, workingTitle, templateId, templateVersion,
-   projectLeadId,
+Publication (activities, baselines and calendar live inside it)
+ { id, workingTitle, templateId, templateVersion, projectLeadId,
    kickoffDate, desiredReleaseDate, bindingReleaseDate | null,
    planState: preliminary | binding,
    lifecycle: idea | go | hold | no_go | active | paused | released | closed,
    funding: { minimumRequired, secured, riskAccepted, applications[] },
-   roleAssignments: { roleId → personId[] },
-   pauses: [{ from, to | null, reason }],
-   calendar: { holidays: dk | dk-official | none, closures[] },
-   baselines: [{ number, capturedOn, reason, releaseDate,  // 0 = "Oprindelig deadline", captured when
-                 activities: { id → { start, deadline } } }],  // the plan becomes binding; never overwritten
+   roleAssignments: { roleId → personId[] }, pauses[{ from, to | null, reason }],
+   calendar: { holidays, closures[] },
+   baselines: [{ number, capturedOn, reason, releaseDate, activities: { id → { start, deadline } } }],
    activities: Activity[] }
 
-Activity (instance, copied from the template and then edited freely)
- { id, templateActivityId | null,                     // null = custom activity added by the user
-   phaseId, trackId, name, kind, responsible, assigneeIds[],
-   durationWorkdays, start | null,                    // start only for kind=task; first working day
-   deadline,                                          // "Aktuel deadline"
-   actualStart | null, actualFinish | null,
-   status: not_started | in_progress | waiting | done | skipped,
-   waitingFor: { text, expectedDate | null } | null,
-   pinned: boolean,                                   // fixed date: event venue, printer slot…
-   optional, gate | null, note, predecessors[] }
+Activity
+ { id, templateActivityId | null, phaseId, trackId | null, name, kind, responsible, assigneeIds[],
+   durationWorkdays, start | null, deadline, actualStart | null, actualFinish | null,
+   status: not_started | in_progress | waiting | done | skipped, waitingFor | null,
+   pinned, optional, compressible?, gate | null, note, predecessors[] }
 
-FundingApplication { id, publicationId, funder, amount, status: planned|submitted|granted|rejected,
-                     submittedAt, expectedDecisionAt, decidedAt, conditions }
-
-Person { id, name, email, defaultRoles[] }
-
-ChangeEvent (append-only log: audit trail, undo/redo, analytics)
- { id, txId, publicationId, effectiveDate, recordedAt, by, type, payload, reason?, reasonCategory?,
-   diff }                                             // field-level diff; undo applies it in reverse
-   types: activity_rescheduled, status_changed, release_date_changed, plan_made_binding,
-          paused, resumed, rebaselined, activity_added, dependency_changed, …
-   reasonCategory: author, editorial, images_rights, design, printer, funding, external, other
+ChangeEvent (append-only log: audit, undo/redo, slip chart, later API sync)
+ { id, txId, publicationId, effectiveDate, recordedAt, by, type, payload, reason?, reasonCategory?, diff }
 ```
 
-**Dates** are stored as ISO `YYYY-MM-DD` strings with no time or timezone. All arithmetic goes
-through a working-day calendar module.
-
-**Baselines vs re-baselining.** "Never overwrite the original deadline" and "moving the release
-re-baselines" are both kept by storing baselines as numbered snapshots: baseline 0 is the
-_Oprindelig deadline_; a re-baseline adds baseline 1, 2, … Variance is measured against baseline 0.
+- **Dates** are `YYYY-MM-DD` strings; all arithmetic goes through the working-day calendar
+  (weekends, Danish holidays including Easter-based ones, closures).
+- **Dependencies:** `start = deadline − duration`; FS means `succ.start ≥ pred.deadline + lag`.
+  `engine/constraints.ts` is the one definition, used by the validator and the engine.
+- **Baselines** are numbered snapshots. Baseline 0 (_Oprindelig deadline_) is captured when the
+  plan becomes binding; moving a binding release or resuming adds baseline 1, 2, … Variance is
+  measured against baseline 0.
+- **Diffs** record field changes and activity add/remove, so every event can be undone and past
+  plans rebuilt from the log.
+- Today a publication takes its phases and tracks from its template version. Phase 7 copies them
+  into the publication (§6.2, step 1).
 
 ---
 
-## 4. Scheduling engine: the core
+## 4. Scheduling engine
 
-The engine is a **pure TypeScript package with no UI dependencies** and heavy unit tests. It is the
-most important code in the project. Keeping it pure means the Gantt, the table, the "what-if" preview
-and (in Stage B) the server all use the same logic.
+A pure TypeScript package (`packages/domain`) with no UI or browser dependencies, so the Gantt,
+the table, previews and the future server share one implementation.
 
 ### 4.1 Capabilities
 
-1. **Generate a plan from the template** (`generatePlan(template, releaseDate, startMeetingDate?, calendar)`)
-   - Phases 3–11 are placed **backwards from the release date** using template offsets and
-     durations (the PDF's "beregnes baglæns").
-   - Phases 1–2 are placed **forwards from the start meeting date**. If the two halves don't fit
-     inside the available time, the engine reports it ("plan is compressed by N weeks").
-2. **Critical path analysis (CPM)**
-   - Forward pass from today and actual progress → **forecast** dates.
-   - Backward pass from the binding release date → **latest allowed** dates.
-   - Output per activity: **slack** (buffer in working days) and **critical** yes/no.
-3. **Delay propagation with a preview** (`previewReschedule(plan, change) → Impact`)
-   - Input: "activity X moves to date D" (or +N days, or "status = waiting until D").
-   - Output: the list of affected activities with old → new dates, slack consumed, milestones moved,
-     pinned-date conflicts, and the new forecast release date compared with the binding one.
-   - Nothing is changed until the user applies the preview.
-4. **Resolution strategies** the user can choose after a slip:
-   - **Absorb**: move only what must move. Downstream slack takes the delay.
-   - **Push all downstream**: keep the internal spacing and shift every successor.
-   - **Compress**: shorten selected downstream tasks to protect the release date. The engine
-     suggests candidates in order of available slack.
-   - **Move release date**: changes the binding date, asks for a reason, and records a re-baseline
-     event.
-5. **Pause / resume** (funding HOLD, waiting on a grant decision)
-   - Pausing freezes the plan. Resuming shifts all unfinished work by the pause length in working
-     days, or replans backwards from a new release date. The user chooses.
-6. **Make binding**: when the _Finansiering tilstrækkelig / risiko godkendt_ milestone is completed,
-   the current plan is captured as **baseline 0** (`baselineDeadline` for every activity) and
-   `planState` becomes `binding`.
-7. **Health classification** per activity, phase and publication:
-   - `late`: past current deadline and not done
-   - `at_risk`: slack below a threshold, or due within N days and not started
-   - `waiting`: blocked, with a reason
-   - `on_track`
-   - `slipped`: current deadline is later than the baseline (with a variance in days)
+1. **Generate a plan** (`generatePlan`). Release-anchored phases are placed backwards from the
+   release, kickoff-anchored phases forwards from the kickoff. If they overlap, the plan keeps
+   the anchored dates and reports `compressionWorkdays` (Phase 7 adds fitting, §6.2 step 4).
+2. **Critical path analysis** (`analyzePlan`): forecast (forward pass from `asOf` and actual
+   progress), latest allowed dates (backward from the release), slack and critical flag.
+3. **Delay propagation with a preview** (`previewReschedule`): affected activities with old → new
+   dates, milestones moved, pinned conflicts, release effect. Nothing changes until applied.
+4. **Strategies** after a slip: **absorb** (move only what must move), **push** (shift
+   downstream work), **compress** (shorten compressible downstream tasks to protect the release),
+   **move release** (with a reason; re-baselines).
+5. **Pause / resume**: resume shifts unfinished work by the pause length, or replans from a new
+   release date.
+6. **Make binding**: completing the funding gate captures baseline 0 and makes the plan binding.
+7. **Health** (`assessHealth`) per activity, phase and publication: late > waiting > at_risk >
+   on_track; slip against baseline 0 is reported separately.
 
-### 4.2 Implementation notes
-
-- Dependency graph as an adjacency list. Topological sort, with cycle detection that rejects the
-  change and names the cycle.
-- Working-day calendar: weekends, Danish holidays (including Easter-based moveable feasts), and
-  custom closures per publication or per supplier.
-- Mutations are **commands** that produce a patch and a `ChangeEvent`. This gives undo/redo, an
-  audit log and, later, API sync from one mechanism.
-- Tests: Vitest for unit tests, plus property-based tests (fast-check) for invariants such as "no
-  successor starts before its predecessor finishes plus lag" and "pinned dates never move silently".
-
-Decisions made while building it (Phase 1):
+### 4.2 Implementation decisions
 
 - **Working-day axis.** The engine computes on integer positions, one per working day
-  (`WorkCalendar.ordinal`), so dependency rules are plain arithmetic. `engine/constraints.ts` is
-  the single definition of FS/SS/FF, used by the template validator and the engine alike.
-- **Forecast never pulls work earlier** than its planned dates; it pushes later for late
-  predecessors, for work not started by `asOf`, for late starts and for waiting.
-- **Slack is measured against the release** for everything that leads to the release. Side tracks
-  (press, funding follow-up) and post-release work are measured against their own deadlines, so
-  they warn on their own without eating into the main chain's slack.
-- **Critical path** = walk back from the release milestone through the predecessor with least
-  slack. With the default network this reproduces the chain in `masterplan-defaults.md`.
-- **Rescheduling only moves what is downstream of the change.** Done and pinned activities never
-  move (pinned conflicts are reported and must be accepted explicitly). A task that has started
-  keeps its actual start; moving its deadline stretches it.
-- **Push** shifts downstream work before the release; the release only moves if it has to.
-  **Compress** shortens not-started tasks on the chain that drives the release, longest first,
-  down to 50% of their duration by default.
-- **Pause/resume** and **release date changes** shift remaining work (not overdue work, so
-  lateness stays visible), then repair dependencies; nothing that has not started may start
-  before the resume date.
-- **Health**: late > waiting > at_risk > on_track. At risk = forecast slip, negative slack (the
-  threshold is configurable), or a pinned conflict. Slip against baseline 0 is reported separately.
-- **Simulation** goes through the same commands as the user. Random draws depend only on
-  (seed, activity, day); the only carried state is each started task's expected finish.
+  (`WorkCalendar.ordinal`), so dependency rules are plain arithmetic.
+- **Forecast never pulls work earlier** than planned; it pushes later for late predecessors, work
+  not started by `asOf`, late starts and waiting.
+- **Slack is measured against the release** for everything leading to it. Side tracks (press,
+  funding follow-up) and post-release work are measured against their own deadlines.
+- **Critical path** = walk back from the release through the predecessor with least slack.
+- **Rescheduling only moves what is downstream.** Done and pinned activities never move (pinned
+  conflicts must be accepted explicitly). A started task keeps its actual start; moving its
+  deadline stretches it.
+- **Push** shifts downstream work before the release; the release moves only if it has to.
+  **Compress** shortens not-started, compressible tasks on the release chain, longest first, down
+  to 50 %. Printing, production follow-up, transport and delivery are marked "fast varighed".
+- **Pause/resume and release changes** shift remaining work (not overdue work, so lateness stays
+  visible), then repair dependencies; nothing not yet started may start before the resume date.
+- **At risk** = forecast slip, negative slack or a pinned conflict. On the overview it counts only
+  work due within two weeks; otherwise everything downstream of a slip is "at risk" (514 items
+  across 11 stress books).
+- **Commands** (`commands/`) take a `CommandContext` (`asOf`, `recordedAt`, `by`, `newId`) and
+  return `{ publication, events }`. One user action is one transaction; sub-commands fold in with
+  `Transaction.include`, so one undo reverts e.g. a whole gate decision. Refused commands throw
+  `CommandError(code, message)`.
+- **Previews run the real command** (`previewCommand`) against a throwaway context, and
+  `comparePlans` describes the result. Preview and apply cannot disagree.
+- **Funding:** `secured` is the sum of granted applications. The funding gate can only be
+  completed when the minimum is secured or the risk is accepted. **GO/HOLD/NO-GO** is one
+  command (`decideGate`): GO completes the gate (resuming if on hold), HOLD pauses with lifecycle
+  "hold", NO-GO stops the book.
+- **Templates** are edited through pure functions (`templates/edit.ts`) that throw
+  `TemplateEditError`. Schedule edits move neighbours minimally (`fitTemplateAround`); the release
+  stays on day 0; gate milestones cannot be removed or change kind. Removing an activity drops
+  the dependencies on it without bridging (the validator warns instead).
+- Tests: Vitest unit tests, fast-check property tests (e.g. "no successor starts before its
+  predecessor plus lag", "pinned dates never move silently"), scenarios replayed as regression
+  tests.
 
 ### 4.3 Time and simulation
 
-A plan only shows its value as time passes: activities become late, slack is used up, milestones
-slip, the release date comes under pressure. We need to see this on demand, without waiting months.
-Time is therefore an **explicit input**, never read implicitly.
+Time is an explicit input. **Nothing in `packages/domain` reads the system clock**; everything
+that depends on "today" takes `asOf`. In the app, `lib/clock.ts` supplies the real or simulated
+date.
 
-**Rule: nothing in `packages/domain` reads the system clock.** Every function that depends on
-"today" (health, forecast, late/at-risk, "due this week", the today line) takes an `asOf: IsoDate`
-argument. In the app a single `Clock` provides that date. It is either the real date or a simulated
-one.
-
-Three levels, built up across the roadmap:
-
-1. **Time travel (Tidsmaskine).** A toolbar that sets the simulated date: date picker, +1 day,
-   +1 week, +1 month, back to today, and **Play** (advance a week every second or so). The whole UI
-   re-renders as of that date. A clear banner shows that the date is simulated.
-2. **Progress simulation.** `simulateProgress(state, from, to, policy, seed)` in the domain package
-   plays the team's work forward. It starts and completes activities according to the plan, with
-   a seeded random delay distribution. Policies:
-   - _On plan_: everything finishes on time.
-   - _Realistic_: some activities slip, mostly the long ones such as writing and image rights.
-   - _Stress_: many slips, plus injected events.
-   - _Custom_: per-activity overrides.
-
-   Results go through the same command layer as user edits. History, the slip chart, health and
-   undo all behave exactly as with real use.
-
-3. **Scenario library.** Named, reproducible scenarios: a seed, a start state and a script of
-   events at given dates. Examples:
-   - "Forfatteren er 3 uger forsinket"
-   - "Fondssvar udebliver → HOLD i 6 uger"
-   - "Trykkeriet forsinker 1 uge"
-   - "Tre bøger lukkes i samme uge"
-
-   They serve as client demos, as Playwright end-to-end fixtures, and as engine regression tests.
-   For the tests, a scenario is replayed week by week and a snapshot of forecast and health is
-   taken at each step.
-
-Design consequences:
-
-- `ChangeEvent` carries two times: `effectiveDate` (the business date, simulated or real) and
-  `recordedAt` (wall-clock time). The history and slip chart use `effectiveDate`.
-- **Simulation never touches real data.** It runs in a separate **demo workspace** (its own
-  IndexedDB store, resettable), or in a scenario sandbox copy (§4.1, Phase 4). The real workspace
-  always uses the real clock.
-- **Seed data is generated by simulation.** Demo books are created a number of months back and
-  simulated forward to the current (or simulated) date. Demo data then always looks realistic
-  relative to "today", instead of going stale.
-- Stage B: the server gets an injectable clock too. Time travel is enabled only for demo and
-  staging tenants.
+- **Tidsmaskine:** date picker, ±day/week/month, back to today, play. A banner shows that the
+  date is simulated.
+- **Progress simulation** (`simulateProgress`) plays the team's work forward through the same
+  commands as the user, with policies _on plan_, _realistic_ and _stress_ (most tasks overrun by
+  20–100 %, milestones slip more often, about one task in eight waits 3–10 days). Random draws
+  depend only on (seed, activity, day).
+- **Scenario library:** named, reproducible scenarios (seed, start state, scripted events at
+  dates, including a funding story). Used for demo books, as regression tests, and later as
+  Playwright fixtures.
+- **Two workspaces.** _Real_ uses the real clock and is never simulated. _Demo_ always has a
+  simulated date: forward plays every demo book on; backward rebuilds the demo from the library
+  (the user is asked first). Simulated changes are logged but clear the undo stack.
+- `ChangeEvent` carries `effectiveDate` (business date, possibly simulated) and `recordedAt`
+  (wall clock). History and the slip chart use `effectiveDate`.
+- Stage B: the server gets an injectable clock; time travel only in demo and staging tenants.
 
 ---
 
-## 5. Frontend: views and UX
+## 5. Frontend
 
-UI language: **Danish** (the client's working language). Code and identifiers are in English. Text
-goes through a small i18n dictionary from day one so English can be added later.
+UI text is Danish (`apps/web/src/i18n/da.ts`); code is English.
 
 ### 5.1 Screens
 
-1. **Portfolio overview (Oversigt)**
-   - Cards or rows per publication: title, lifecycle, binding/desired release date, health, next
-     milestone, % complete, funding status, total slip vs baseline.
-   - **Portfolio Gantt**: one row per publication showing phase bands and milestone diamonds across
-     the year. It shows release clustering and overlapping crunch periods (several books in "Bogen
-     lukkes" at the same time).
-2. **Publication: Gantt (the main view)**
-   - Rows grouped Phase → Track → Activity, collapsible. Finished phases are collapsed by default.
-   - Task bars, deadline ticks, milestone diamonds.
-   - **Baseline ghost bars** under current bars, with a variance badge (`+12 d`).
-   - **Slack tails** after bars. A **critical path** toggle.
-   - **Today line**, **binding release line**, and a dashed **desired release line** while the plan
-     is preliminary. The preliminary plan is drawn hatched.
-   - **Pause bands** across the chart for HOLD periods.
-   - Dependency arrows. Create a link by dragging from a bar's end to another bar.
-   - **Drag a bar or deadline later → live preview**: downstream bars move as ghosts while dragging
-     and the release marker turns red if it would slip. On drop, a popover asks for a reason and a
-     strategy (§4.1.4) before applying.
-   - Resize to change duration. Keyboard nudge ±1 day / ±1 week. Zoom week / month / quarter.
-   - Filters: role, person, status, health ("only late / at risk / waiting").
-   - Click opens the **activity side panel**.
-3. **Publication: Table (Tabel)**
-   - Spreadsheet-style view that mirrors the PDF the client already knows: Aktivitet, Ansvarlig,
-     Start, Oprindelig deadline, Aktuel deadline, Status, Bemærkning.
-   - Inline editing and keyboard navigation. Changing _Aktuel deadline_ runs the same impact preview
-     as the Gantt.
-4. **Activity side panel**: status, waiting-for, assignees, dates (baseline vs current), pinned flag,
-   predecessors and successors, notes, and the change history of this activity.
-5. **Postpone / replan dialog (Udskyd)**, reachable from anywhere ("Udskyd…" on an activity,
-   milestone or the whole publication):
-   - Choose new date or +N days, and a reason category plus free text.
-   - Impact preview: affected items, release date effect, slack used, conflicts.
-   - Choose a strategy, then apply. The result can be undone.
-6. **Funding (Finansiering)** tab: applications, amounts, expected decisions, secured vs minimum, the
-   gate state, and a "Pause project" action.
-7. **History (Historik)**: change log per publication, filterable. Includes a **milestone slip chart**
-   (x = date of change, y = forecast date per milestone), the standard way to show drift over time.
-8. **My work (Mine opgaver)**: what is due this week or overdue for a person or role, across all
-   publications.
-9. **Master plan editor (Masterplan)**: edit phases, tracks, activities, default durations, offsets,
-   dependencies and milestones. Versioned, so existing publications keep the version they were
-   created from.
-10. **New publication wizard**: title, project lead, desired release date, start meeting date,
-    template version, optional activities on/off, role → person assignments. Shows a preview of the
-    generated plan before creating it.
+1. **Oversigt (portfolio).** Six tiles (books in progress, overdue, at risk, waiting, due this
+   week, slipping releases), the **portfolio Gantt** (one line per book; phases as bands in a
+   one-hue ordinal ramp so books in the same phase line up; done work at actual dates, open work
+   at forecast; release target and red forecast when later; pauses hatched), and two work lists:
+   "Kræver opmærksomhed" and "Denne uge". Paused, HOLD and NO-GO books show their lifecycle
+   instead of health. Empty workspaces show a three-step onboarding.
+2. **Publication Gantt** (custom component, `components/gantt`). Rows Phase → Track → Activity,
+   collapsible; bars, deadline ticks, milestone diamonds; baseline ghosts with variance badges;
+   hatched forecast tails and thin slack tails; critical path toggle; today, binding and desired
+   release lines; hatched preliminary plan; pause bands. Dependency arrows for the hovered or
+   selected activity ("Alle afhængigheder" shows all); drag from a bar's end to create an FS
+   link. Drag and resize snap to working days, and every drag or keyboard nudge (← →, Shift for
+   a week) draws live impact ghosts and a release marker; drop opens the impact dialog. The axis
+   is calendar days with non-working days shaded; zoom week 28 px/day, month 8, quarter 3.
+3. **Plan table** in the PDF's columns, grouped Phase → Track, hand-written (no TanStack Table),
+   with inline status and notes. Changing _Aktuel deadline_ opens the impact dialog.
+4. **Activity side panel:** status, waiting-for, assignees, baseline vs current dates, pinned,
+   predecessors and successors, notes, history.
+5. **Impact dialog (Udskyd)** for one activity: new date or "+N arbejdsdage", reason category and
+   text, preview, strategy, apply; undoable. Whole-plan changes sit in the **Planlægning** menu:
+   move release, pause/resume, make binding, save baseline, roles and people, try a scenario.
+6. **Finansiering** tab: applications, secured vs minimum, gate state, GO/HOLD/NO-GO dialog.
+7. **Historik:** filterable log and the **milestone slip chart**, rebuilt from the log
+   (`planTimeline`, `milestoneTrend`; weekly samples plus every planning change). Six key
+   milestones get series colours; "Vis alle milepæle" adds the rest in grey. The table under the
+   chart doubles as legend.
+8. **Mine opgaver:** open work for everyone, a person or a role, bucketed (overdue, waiting, due
+   this week, starting this week, due next week, in progress). A person matches through
+   assignees, role assignments or being project lead.
+9. **Masterplan** page and **editor**: read-only view with version list and comparison; the
+   editor edits one draft per template with undo, shows "N uger før" next to offsets and a
+   "Faktisk" column (median actual duration, highlighted at 3+ days' difference), and publishes
+   only without validator errors. Versions are stored per workspace (`template:<id>@<n>`,
+   `draft:<id>`) and travel with export/import.
+10. **New publication wizard:** title, project lead, release and kickoff dates, master plan
+    version, optional activities on/off, preview before creating.
+11. **Scenario mode:** a fork of one publication's record. While open, every command, undo and
+    redo goes to the copy; the Gantt draws the live plan as dotted ghosts where they differ.
+    Applying replaces the live record (refused if the live record changed meanwhile). The
+    Tidsmaskine is frozen while a scenario is open; scenarios are in memory only. In the demo,
+    "Fra scenarie…" adds up to 10 books following a library scenario.
+12. **Print / PDF** (`/publications/<id>/print`): a static, percent-based Gantt (one block per
+    phase with its own month axis) and the table in the PDF's columns. `@page` sets A3 landscape
+    (A4 selectable); the browser's "Gem som PDF" makes the file. No PDF library.
 
-### 5.2 Gantt implementation decision
+Cross-cutting: refused commands and template edits show Danish toasts via `lib/errors.ts`; a
+Danish error page inside the layout; skip link, page titles and labelled controls; dismissible
+first-visit hints.
 
-**Recommendation: build our own Gantt component on top of our scheduling engine.**
+### 5.2 Tech stack
 
-- Delay handling is the product's main differentiator. Live impact preview while dragging, baseline
-  ghosts, slack tails, pause bands and preliminary/binding states are all custom behaviour. A
-  library's built-in scheduler (DHTMLX, Bryntum) would compete with our engine and limit the UX.
-- The data volume is small (~130 rows per publication; a portfolio of tens of publications), so
-  performance is not a reason to use a library.
-- Rendering: a CSS grid of rows with absolutely positioned bars (HTML) and an SVG overlay for
-  dependency arrows. Pointer-event drag handling. Row virtualization (TanStack Virtual) only if
-  needed.
-- **Fallback**: if the custom route turns out too costly, run a 1–2 day spike with **SVAR React
-  Gantt** (MIT core) or **Bryntum Gantt** (commercial, feature-complete but expensive) and compare.
+| Concern     | Choice                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Build       | pnpm monorepo (`packages/domain`, `apps/web`), Vite 8, React 19, TypeScript 6 (strict) |
+| Routing     | TanStack Router (file routes)                                                          |
+| State       | Zustand; all plan changes via `execute(id, command)`                                   |
+| Persistence | IndexedDB via `idb-keyval` behind a repository interface; JSON export/import           |
+| UI          | Tailwind v4, hand-written shadcn/ui components (Radix), lucide icons                   |
+| Charts      | Hand-written SVG/HTML (Gantt, portfolio Gantt, slip chart)                             |
+| Validation  | Zod                                                                                    |
+| Tests       | Vitest, fast-check, Testing Library (jsdom). No Playwright yet.                        |
+| Deploy      | Docker image, GitHub Actions to pms.mkjems.dk                                          |
 
-### 5.3 Tech stack (Stage A)
-
-| Concern                | Choice                                                                                        | Why                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Build                  | **Vite** + **React 19** + **TypeScript** (strict)                                             | Fast, standard, no server needed in Stage A                            |
-| Monorepo               | **pnpm workspaces**: `packages/domain`, `apps/web` (later `apps/api`)                         | Engine and schemas are shared with the backend later                   |
-| Routing                | **TanStack Router**                                                                           | Type-safe routes and search params (filters and zoom live in the URL)  |
-| State                  | **Zustand** + **Immer** (patches for undo/redo)                                               | Simple, fast, works with the command/event pattern                     |
-| Persistence            | **IndexedDB** via `idb-keyval`, behind a `Repository` interface; JSON export/import           | Survives reloads; demo datasets can be shared with the client          |
-| Server state (Stage B) | **TanStack Query**                                                                            | Added when the API arrives; the repository interface makes this a swap |
-| UI                     | **Tailwind CSS v4** + **shadcn/ui** (Radix primitives)                                        | Modern, accessible, fully customizable                                 |
-| Tables                 | **TanStack Table**                                                                            | Editable grid for the Table view                                       |
-| Dates                  | **date-fns** + our own working-day calendar                                                   | Small and tree-shakeable                                               |
-| Validation             | **Zod**                                                                                       | Shared schemas for the API later                                       |
-| Charts                 | **Recharts** or visx                                                                          | Slip chart, progress charts                                            |
-| Tests                  | **Vitest** (engine, stores), **Testing Library**, **Playwright** (Gantt drag and delay flows) |                                                                        |
-| Quality                | ESLint, Prettier, TypeScript strict, Husky pre-commit                                         |                                                                        |
+**Performance** (20 books, 3,580 activities): portfolio health ~13 ms, a week of time travel
+~11 ms, the slip chart of a 300-event book ~28 ms. React rendering of large charts is not
+profiled.
 
 ---
 
-## 6. Roadmap (Stage A)
+## 6. Roadmap
 
-Each phase ends with something demoable. Sizes are relative (S ≈ a few days, M ≈ 1–2 weeks,
-L ≈ 2–3 weeks).
+### 6.1 Done (Phases 0–6)
 
-### Phase 0: Foundations (S)
+| Phase | Delivered                                                                                                                                            |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Monorepo, tooling, app shell, master plan v1 as data, proposed durations and dependencies                                                            |
+| 1     | Calendar, generation, CPM, reschedule preview and strategies, pause/resume, baselines, health, commands with undo/redo, simulation, scenario library |
+| 2     | IndexedDB workspaces (real/demo), Tidsmaskine, portfolio list, wizard, plan table, impact dialog, side panel                                         |
+| 3     | Interactive Gantt with live impact preview                                                                                                           |
+| 4     | Whole-plan dialogs, scenario mode, history with slip chart, scenario books in the demo                                                               |
+| 5     | Oversigt with portfolio Gantt, Mine opgaver, funding and gate logic, role assignments, stress policy                                                 |
+| 6     | Master plan editor with versions, print/PDF, Danish errors, onboarding, accessibility and performance pass                                           |
 
-- Git repo, pnpm monorepo, Vite app, lint/format/test tooling.
-- Design tokens and app shell (sidebar navigation, header) with shadcn/ui.
-- **Encode the master plan as data**: `packages/domain/src/templates/masterplan-v1.ts` with all
-  phases, tracks, activities, roles and milestones from the PDF.
-- Proposed default durations and dependency network, written down for client review.
-- _Demo:_ app shell; the template rendered as a read-only list.
+Findings that still matter:
 
-### Phase 1: Domain and scheduling engine (M–L)
+- The default network has ~25 working days of float on the release chain at production start; a
+  3-week author delay is absorbed without moving the release, and a HOLD only starts moving the
+  release forecast after about 5 weeks.
+- Every move of a binding release and every resume saves a new baseline, so a busy book collects
+  many (open question 3).
+- Playwright end-to-end tests are still missing; flows are covered by component tests and manual
+  checks.
 
-- Types and Zod schemas (§3).
-- Working-day calendar with Danish holidays.
-- `generatePlan`, CPM forward/backward passes, slack, critical path.
-- `previewReschedule` plus the four strategies, pause/resume, make-binding/baseline.
-- Health classification. All "today"-dependent functions take `asOf` (§4.3).
-- Command layer producing `ChangeEvent`s (with `effectiveDate` and `recordedAt`). Undo/redo.
-- Seeded random generator and `simulateProgress` with the _on plan_ and _realistic_ policies.
-- _Exit criteria:_ engine test suite green, including property tests and a first replayed scenario.
+### 6.2 Phase 7: Flexible plans (L)
 
-### Phase 2: Publications and the table view (M)
+**Client feedback (first look at the demo site, 2026-11):** the system is too rigid. The client
+wants to run both small and large projects; today every book takes the same time. They want to
+add and remove activities and deadlines in a running book, keep a list of master plans, pick
+one when creating a book, change its activities freely, and save a book's plan as a new master
+plan. Durations, deadlines and dependencies should be out in the open and editable. Master plan
+editing should be as visual as the publication Gantt. Also: better icons. A real user system
+with roles is wanted later (Stage B, §7).
 
-- Repository interface with an IndexedDB implementation. Real and demo workspaces are kept apart.
-- Demo workspace seeded by simulation: 3–5 sample books started at different times and simulated to
-  "today", some of them delayed.
-- `Clock` and the **Tidsmaskine** toolbar (date picker, step forward and back, play, reset).
-- Portfolio list. New-publication wizard (generates a plan from the template).
-- Table view with inline editing, status changes and the activity side panel.
-- JSON export/import.
-- _Demo:_ create a book, see its full plan as a table, update statuses.
+**Root causes:** (a) one master plan per workspace; (b) a book is the template frozen at its
+offsets, structure included, so it cannot change shape and does not scale with the time
+available; (c) the master plan is edited as a form, not as a schedule. The engine, delay
+handling, scenarios and history are not affected.
 
-Decisions made while building it:
+**Goal:** the plan adapts to the book. A master plan is a starting point, not a mould.
 
-- **No TanStack Table.** The plan table is grouped Phase → Track with inline editors; a hand-written
-  table (like the Masterplan page) was simpler. Revisit if sorting/column features are needed.
-- **The demo workspace always has a simulated date.** Forward in time plays every demo book on
-  (scripted events + simulation, including books the user creates there). Backward rebuilds the
-  demo data as of that date from the scenario library; the user is asked first if they changed
-  anything. Simulated changes are logged but clear the undo stack (time has moved on).
-- **The impact preview is already in the table**: changing _Aktuel deadline_ opens a dialog with
-  the four strategies, release effect, moved activities, pinned conflicts and a reason. Phase 4
-  builds on it (Gantt drag, pause/resume UI, scenario mode).
-- People are created on the fly in the wizard (project lead). Role → person assignments are not
-  in the UI yet.
+Steps, in order (each ends with something demoable):
 
-### Phase 3: Interactive Gantt (L)
+1. **The book owns its structure.** Copy phases and tracks into the publication at generation
+   (with a migration for existing books), so the Gantt, table and print read the book, not the
+   template. `templateId`/`templateVersion` remain as "based on".
+2. **Add and remove in a running book.** New commands with events `activity_added`,
+   `activity_removed`, plus `track_added`/`track_removed`/`track_renamed`. Adding places a custom
+   activity (`templateActivityId: null`) in a track, either at a date or after a predecessor,
+   through the impact preview. Removing drops dependencies on it (as in the template editor) and
+   keeps it in the history; done activities can be removed too. `skipped` is allowed for any
+   activity, not only optional ones. The release milestone can be neither removed nor skipped;
+   for the other gates see question 11. UI: "Tilføj aktivitet" on track rows in the Gantt and
+   table, "Fjern" in the side panel and context menu. All undoable.
+3. **Several master plans.** A list page (Masterplaner): create blank, copy an existing one,
+   rename, archive. Each has its own versions and draft (drafts are already keyed by template
+   id). Version 1 of today's plan becomes "Standard". Books keep the plan and version they came
+   from.
+4. **Wizard and "save as master plan".** The wizard picks a master plan and version, then shows
+   the full activity list to include or exclude (gates locked) and add to, with a live Gantt
+   preview. A book's current plan can be saved as a new master plan or as a new version of an
+   existing one (offsets relative to its release; durations from the plan or, optionally, the
+   actual durations). The wizard offers this too.
+5. **Fit to the time available.** When kickoff → release is shorter or longer than the master
+   plan assumes, `generatePlan` can scale compressible task durations (and the gaps between
+   them) to fit, with a minimum of one day and fixed-duration tasks untouched. The wizard shows
+   what changed ("Planen er 30 % kortere end masterplanen, 42 opgaver er forkortet") and lets the
+   user choose between fitting and keeping the master plan's durations (today's behaviour). How
+   this combines with plans per book type depends on question 12.
+6. **Assumptions in the open.** The Masterplan page shows every activity's duration, deadline
+   (weeks before release), dependencies with lag, fixed/compressible, and the reasoning from
+   [masterplan-defaults.md](masterplan-defaults.md) as notes in the app. In a book, the table can
+   show and edit duration and predecessors inline (via the existing commands), and the book
+   shows how it differs from its master plan (`compareTemplates`).
+7. **Visual master plan editor.** A Gantt of the draft on a "weeks before release" axis, reusing
+   `gantt/scale.ts` and `rows.ts`: drag to move a deadline, resize for duration, drag to link,
+   with ghosts for what `fitTemplateAround` moves; the existing activity sheet for the other
+   fields. The table editor stays as a second view.
+8. **Icons.** Review activity-kind, status and navigation icons with the client; replace unclear
+   ones (lucide).
 
-- Timeline scale and zoom, grouped and collapsible rows, bars, ticks, milestones, today and release
-  lines.
-- Baseline ghosts, variance badges, slack tails, critical path toggle, dependency arrows.
-- Drag and resize with snap to working days; keyboard nudging; dependency creation by drag.
-- Table and Gantt stay in sync (one store).
-- _Demo:_ the publication as a Gantt chart, editable.
-
-Decisions made while building it:
-
-- **Live impact ghosts while dragging are already in** (planned for Phase 4): every drag or
-  keyboard nudge runs `previewReschedule` (absorb) and draws dashed ghosts for everything that
-  would move, plus a release marker (red if it would slip). Nothing is applied until the impact
-  dialog is confirmed.
-- The axis is calendar days (weekends and holidays shaded); dragging snaps to working days in
-  the direction of the drag. Zoom: week 28 px/day, month 8, quarter 3.
-- Done tasks are drawn at their actual dates; open tasks at their planned dates with a hatched
-  forecast tail when the forecast is later, and a thin slack tail up to the latest deadline.
-- Dependency arrows are shown for the hovered/selected activity by default; "Alle
-  afhængigheder" shows all. A new dependency (drag from the end handle) is finish-to-start with
-  no lag and does not move anything by itself; the forecast shows its effect.
-- Keyboard: Tab to a bar, ← → (Shift: a week) to nudge with live preview, Enter to open the
-  impact dialog, Esc to cancel. Enter on a bar without a nudge opens the side panel.
-
-### Phase 4: Delays and replanning (M–L), the key differentiator
-
-- Live impact ghosts while dragging.
-- Postpone dialog with reason, impact preview, strategy choice, apply and undo.
-- Pause/resume a publication (funding HOLD) with pause bands.
-- Release date change and re-baseline flow. Preliminary vs binding plan visuals.
-- Change history view with the milestone slip chart.
-- Optional **scenario mode**: try changes in a sandbox copy, compare with the live plan, then commit
-  or discard.
-- **Scenario library** (§4.3): named, reproducible delay scenarios with event injection. Also used as
-  Playwright fixtures.
-- _Demo:_ "the author is 3 weeks late"; the full impact is visible and resolved in a few clicks.
-
-Decisions made while building it:
-
-- **Previews run the real command.** Commands are pure, so `previewCommand` runs pause, resume
-  or a release change against the current plan with a throwaway context, and `comparePlans`
-  describes the result (moved activities, milestone forecasts, release target and forecast).
-  Preview and apply can never disagree.
-- **Whole-plan changes live in one "Planlægning" menu** on the publication: move the release
-  date, pause/resume, make binding, save a baseline, try a scenario. The postpone dialog for a
-  single activity (table, side panel, Gantt drop) accepts a date or "+N arbejdsdage".
-- **Scenario mode is a fork of the publication's record** (plan and history). While open, every
-  command, undo and redo on that book goes to the copy; the live plan and the portfolio are
-  untouched. Applying replaces the live record with the copy, so each change stays a separate,
-  undoable transaction in the log. Applying is refused if the live record changed meanwhile, and
-  the Tidsmaskine is frozen while a scenario is open. Scenarios are kept in memory only (not
-  persisted). The Gantt draws the live plan as dotted ghosts where the scenario differs.
-- **The slip chart is reconstructed from the log.** Every event has a diff, so undoing the log
-  backwards gives the plan as it was on any day (`planTimeline`). `milestoneTrend` samples it
-  weekly plus on every planning change and runs the forecast as of each date. Six key
-  milestones (the gates, _Manus låst_, _Trykgodkendelse_) get series colours in a fixed order;
-  "Vis alle milepæle" adds the rest as neutral grey lines. The table under the chart is both
-  legend and table view.
-- **Scenario library in the UI:** in the demo, "Fra scenarie…" adds a book that follows a library
-  scenario, played up to the simulated date; the rest of its script plays as time moves on.
-- Not done: Playwright end-to-end tests with the scenarios as fixtures (no Playwright setup yet;
-  the scenarios are covered as engine regression tests and the flows were checked by hand).
-
-### Phase 5: Progress tracking and portfolio (M)
-
-- Health indicators per activity, phase and publication; % complete per phase.
-- Portfolio overview and portfolio Gantt.
-- "My work" view by person or role.
-- Funding tab and gate logic (GO/HOLD/NO-GO, funding sufficient → binding).
-- _Stress_ simulation policy. Play a whole portfolio forward to check that the overview stays
-  readable when many things slip at once.
-- _Demo:_ the publisher's Monday overview: what is late, what is at risk, what is due this week.
-
-Decisions made while building it:
-
-- **Oversigt** has six tiles (books in progress, overdue activities, at risk, waiting, deadlines
-  this week, releases that slip), the portfolio Gantt, and two work lists: "Kræver
-  opmærksomhed" (overdue and waiting) and "Denne uge" (due or starting by Sunday).
-- **"At risk" counts only work due within two weeks.** The stress test showed why: everything
-  downstream of a slip has negative buffer, so the whole-plan count reached 514 across 11 books.
-- **Portfolio Gantt:** one line per book. Phases are bands in an ordinal ramp of one hue (light =
-  phase 1, dark = phase 11), so books in the same phase in the same week line up; done work is
-  drawn at its actual dates and open work at its forecast. Key milestones, the release target,
-  and the release forecast (red, with a dashed connector) when it is later. Pauses are hatched.
-- **Mine opgaver** lists open work for everyone, a person or a role, in buckets: overdue,
-  waiting, due this week, starting this week, due next week, in progress (`workItems` in the
-  domain). A person matches through the activity's assignees, the book's role assignments, or
-  being its project lead. Paused and stopped books have no current work.
-- **Role assignments** are edited per book (Planlægning → Roller og personer). Assigning the
-  project-lead role also sets the book's project lead.
-- **Funding:** `funding.secured` is always the sum of granted applications. The funding gate
-  (_Finansiering tilstrækkelig_) can only be completed when the minimum is secured or the
-  publisher has accepted the risk; the simulation respects this, so a late grant holds the
-  milestone (and the binding plan) back. Library scenarios carry a funding story (submissions
-  and decisions as scripted events).
-- **GO / HOLD / NO-GO** is one command (`decideGate`): GO completes the gate (resuming the plan,
-  shifted by the hold, if it was on HOLD); HOLD pauses the book with lifecycle "hold"; NO-GO
-  stops it, and the simulation stops playing it. Choosing "Færdig" on the gate opens the
-  decision dialog. Sub-commands are folded into one transaction (`Transaction.include`), so one
-  undo reverts the whole decision.
-- **Stress policy:** most tasks overrun (by 20–100 %), milestones slip more often, and about one
-  task in eight stops to wait for an outside party for 3–10 working days. The library has an
-  "Alt skrider" scenario; "Fra scenarie…" can create up to 10 books at once, 3 weeks apart.
-- Paused, HOLD and NO-GO books show their lifecycle instead of a health badge in the lists.
-  The Udgivelser table also shows funding and the release slip against the original plan.
-- Refused commands now show as a toast on any page, not only on the publication page.
-
-### Phase 6: Template editor, polish and client validation (M)
-
-- Master plan editor with versioning.
-- Print and PDF export of a publication plan (A3 landscape Gantt plus a table in the PDF's layout).
-- Accessibility pass, empty states, onboarding hints, performance check.
-- Client test sessions with real upcoming titles. Feedback goes into the backlog for Stage B.
-
-Decisions made while building it:
-
-- **Versions are per workspace.** Version 1 is built in; a workspace's own versions and its
-  draft are stored next to its books (IndexedDB keys `template:<id>@<n>` and `draft:<id>`) and
-  travel with export/import. Demo resets and time travel keep them. Published versions never
-  change; books keep the version they were generated from, and the wizard offers the latest by
-  default. There is one master plan (`masterplan`); several templates per book type would be a
-  small step (§8 question 2).
-- **One draft at a time, edited through pure functions** (`templates/edit.ts`) that refuse
-  invalid edits with a coded `TemplateEditError`. The editor keeps an in-memory undo stack.
-  Publishing requires a validator with no errors; warnings (an activity without predecessors, a
-  milestone outside its phase window, work before the kickoff) are shown but allowed.
-- **Schedule edits move neighbours, minimally.** Changing a duration or deadline pushes
-  successors later and pulls predecessors earlier, each only as far as a dependency requires
-  (`fitTemplateAround`). Adding a dependency moves the successor. The release stays on day 0;
-  a change that would push it is left as an error to resolve. Removing an activity drops the
-  dependencies on it without moving anything. Gate milestones cannot be removed or change kind.
-- **`compressible` flag** (the Phase 2 finding): tasks can be marked "fast varighed"; the compress
-  strategy never shortens them. Version 1 marks printing, production follow-up, transport and
-  delivery.
-- **"Faktisk" column:** the median actual duration of finished tasks in the workspace, by template
-  activity (`actualDurations`), shown next to the template duration and highlighted when they
-  differ by 3+ days. This is the PDF's "Erfaringer føres tilbage i masterplanen".
-- **Version comparison** (`compareTemplates`) lists added, removed and changed phases, tracks and
-  activities with the fields that changed. It is shown in the publish dialog and per version on
-  the Masterplan page. Real edits are listed first; activities that only moved to keep the
-  dependencies are folded into one line ("29 aktiviteter flyttet"), since one longer task can
-  move a whole upstream chain.
-- **Print uses the browser.** `/publications/<id>/print` renders a static Gantt (percent-based,
-  one block per phase with its own month axis, kept on one page where possible) and the table
-  in the PDF's columns, with the header repeating on each page. `@page` sets A3 landscape (A4
-  selectable); "Gem som PDF" in the print dialog makes the PDF, and the page title becomes its
-  file name. No PDF library.
-- **Refused commands are explained in Danish.** `CommandError` now carries a code (like
-  `TemplateEditError`); `lib/errors.ts` maps both to `da.ts`, so English engine messages no longer
-  reach the UI.
-- **Onboarding:** an empty workspace shows a three-step start (review the master plan, create a
-  book, try the demo); three first-visit hints (demo, a book's page, the master plan) can be
-  dismissed and stay dismissed in that browser.
-- **Error page:** a page that fails to render shows a Danish error inside the layout (the
-  router's `defaultErrorComponent`), with "Prøv igen" and a way back to the overview.
-- **Accessibility:** a skip link, a page title per page, labelled icon buttons and form controls
-  (checked across the app), print-friendly colours.
-- **Performance:** with 20 books (3,580 activities, 15 of them on the stress policy) the health
-  of the whole portfolio takes ~13 ms, a week of time travel ~11 ms, and the slip chart of the
-  busiest book (300 events) ~28 ms. The engine is not a bottleneck; React rendering of large
-  charts was not profiled.
-- **Client sessions** are prepared in [klienttest.md](klienttest.md) (Danish): programme, open
-  questions, a note sheet and a backlog split into Stage A fixes and Stage B.
+_Demo:_ create a small book from a short master plan with a few activities removed and one added;
+fit it into 4 months; save it as "Lille bog"; add a deadline to a running book and see the impact.
 
 ---
 
-## 7. Preparing for Stage B (backend) from day one
+## 7. Stage B: backend
 
-Decisions in Stage A that keep the backend a swap rather than a rewrite:
+Stage A choices that keep this a swap rather than a rewrite: the domain package has no browser
+dependencies; persistence sits behind a repository interface; commands and `ChangeEvent`s map
+to API mutations and an audit log; ids are UUIDs created on the client; state is normalized.
 
-- **`packages/domain` has no browser dependencies.** The same engine and Zod schemas run on the
-  server, which can recompute schedules and validate changes.
-- **Repository interface** (`PublicationRepository`, `TemplateRepository`, …). Stage A implements it
-  with IndexedDB; Stage B implements it over HTTP with TanStack Query.
-- **Commands and `ChangeEvent`s** map directly to API mutations and an `audit_log` table.
-- **IDs are UUIDs** generated on the client, which makes offline creation and sync simpler later.
-- **Normalized state**, shaped like future database tables.
+Proposed (to confirm):
 
-### Proposed Stage B architecture (to confirm later)
-
-- **API:** TypeScript (Hono or Fastify), OpenAPI generated from the Zod schemas.
-- **DB:** PostgreSQL with Drizzle ORM. Tables: templates (versioned), publications, activities,
+- **API:** TypeScript (Hono or Fastify), OpenAPI from the Zod schemas.
+- **DB:** PostgreSQL with Drizzle. Tables: templates (versioned), publications, activities,
   dependencies, people, role assignments, funding applications, change events.
-- **Auth:** SSO via Microsoft Entra ID if the client uses Microsoft 365 (likely, given the Word-based
-  workflow); otherwise email magic link. Role-based permissions (e.g. only the project lead or
-  publisher can change binding dates).
-- **Collaboration:** optimistic updates. Live updates (SSE/WebSocket) when several people edit the
-  same plan.
-- **Notifications:** email digests ("due this week", "you are now blocking X"); calendar (ICS) feed
-  of milestones.
-- **Hosting:** EU region for GDPR (personal data of authors and contributors).
+- **Auth and permissions** (asked for by the client): SSO via Microsoft Entra ID if they use
+  Microsoft 365, otherwise email magic link. Roles and authorization, e.g. only the project lead
+  or publisher may change binding dates or publish master plans.
+- **Collaboration:** optimistic updates; live updates (SSE/WebSocket) when several people edit.
+- **Notifications:** email digests, ICS feed of milestones.
+- **Hosting:** EU region (GDPR).
 
 ---
 
 ## 8. Open questions for the client
 
-1. **Scale:** how many publications run at the same time? How many users? Is a person shared across
-   books, and should we show workload or capacity per person?
-2. **Durations and dependencies:** will they validate our proposed defaults? Are there book types
-   that need different templates (picture-heavy art book, translated work, text-only, reprint)?
-3. **Baseline policy:** is the baseline captured when the plan becomes binding? Who may re-baseline,
-   and must a reason be given?
-4. **Approval:** do date changes need approval (e.g. the project lead proposes, the publisher
-   approves) or are they applied directly and logged?
-5. **Calendar:** holidays and closures to respect (printer summer break, Christmas)? Should we track
-   printer slot bookings?
-6. **Funding:** what level of detail is needed: just "secured vs minimum", or full application
-   tracking with amounts and reporting deadlines (fondsafrapportering)?
-7. **Integrations:** Outlook/Google calendar, email reminders, Bogportalen metadata, Excel/PDF
-   export?
-8. **Language:** Danish-only UI, or Danish and English?
-9. **External contributors** (authors, designers, printers): should they get limited access later?
+1. **Scale:** how many books at once, how many users; is workload per person needed?
+2. **Durations and dependencies:** do they accept the proposed defaults?
+3. **Baselines:** who may re-baseline, and should every release move or resume save one?
+4. **Approval:** do date changes need approval, or apply directly and get logged?
+5. **Calendar:** which closures (printer summer break, Christmas)? Book printer slots?
+6. **Funding:** is "secured vs minimum" enough, or full tracking with reporting deadlines?
+7. **"At risk":** is "due within two weeks" the right limit on the overview?
+8. **Integrations:** Outlook/Google calendar, email reminders, Bogportalen, Excel/PDF?
+9. **External contributors:** should authors, designers and printers see their own tasks?
+10. **Language:** Danish only, or English too?
+11. **Gates in a flexible plan:** may a book drop GO/HOLD/NO-GO or the funding gate (e.g. a fully
+    funded commission)? Then the plan would be made binding by hand.
+12. **Small vs large books:** a master plan per book type (small, large, art book, reprint …),
+    one plan that stretches to the time available, or both?
+13. **Icons:** which ones were unclear?
 
----
-
-## 9. Immediate next steps
-
-Phase 0 is done (repo, tooling, app shell, master plan as data, defaults in
-[masterplan-defaults.md](masterplan-defaults.md)).
-
-Phase 1 is done: calendar, generation, CPM analysis, reschedule preview and strategies,
-pause/resume, binding plan and baselines, health, commands with undo/redo, simulation and a
-scenario library replayed as regression tests. The open questions in §8 are parked for now.
-
-Findings to bring to the client review:
-
-- The default network has about **25 working days of total float** on the release chain at
-  production start (the 10-day stock buffer plus small gaps along the chain). A 3-week author
-  delay is absorbed without moving the release.
-- While a publication is on HOLD, the release forecast only starts slipping once that float is
-  used up (about 5 weeks with the defaults).
-
-Phase 2 is done: IndexedDB workspaces (real and demo), the Tidsmaskine, portfolio list, new
-publication wizard, plan table with inline status/notes, impact dialog, activity side panel,
-history tab and JSON export/import.
-
-Found while testing Phase 2:
-
-- **Compression picks unrealistic tasks.** It shortens the longest task on the critical chain,
-  which is often _Tryk og indbinding_ (12 → 6 days). Printing, transport and similar supplier
-  lead times cannot be compressed. Proposal: a `compressible` flag in the template (default true,
-  false for printer/warehouse work), to be confirmed with the client.
-- During a HOLD, overdue activities show as "Forsinket". That is accurate, but the portfolio may
-  want to show "På pause" as the health of a paused book instead (Phase 5).
-
-Phase 3 is done: the interactive Gantt (zoom, collapsible rows, baseline ghosts, variance
-badges, forecast and slack tails, critical path, dependency arrows, today/release/pause lines,
-hatched preliminary plan; drag, resize, keyboard nudge and dependency creation with live
-preview).
-
-Phase 4 is done: release date, pause/resume and binding/baseline dialogs with previews,
-"+N arbejdsdage" in the postpone dialog, scenario mode, the history view with the milestone slip
-chart, baselines and log filters, and scenario books in the demo.
-
-Found while building Phase 4:
-
-- Moving a binding release date or resuming after a pause saves a new baseline each time
-  (§8 question 3: who may re-baseline). In a busy book the baselines list grows quickly; the
-  client may want only some changes to re-baseline.
-- The compression finding from Phase 2 still stands (no `compressible` flag yet).
-
-Phase 5 is done: the Monday overview with the portfolio Gantt, Mine opgaver, role assignments,
-the funding tab and gate logic, per-phase progress, and the stress policy.
-
-Found while building Phase 5:
-
-- With six stress books the overview stays readable: slipping releases stand out in the
-  portfolio Gantt, and the lists are grouped by urgency. Whole-plan "at risk" counts do not
-  scale (see the Phase 5 decisions); the client should confirm what "at risk" should mean on the
-  overview.
-- Demo data created before Phase 5 has no funding stories or role assignments; reset the demo
-  (the ↺ button in the Tidsmaskine) to get them.
-- The funding gate is enforced; §8 question 6 (how detailed funding tracking should be) is still
-  open. Amounts are DKK only.
-
-Phase 6 is built: the master plan editor with versions, print/PDF export, Danish error messages,
-onboarding and empty states, an accessibility pass and a performance check. What remains is the
-client test sessions themselves ([klienttest.md](klienttest.md)).
-
-Found while building Phase 6:
-
-- Editing offsets in working days relative to release is exact but abstract; the editor shows
-  "N uger før" next to every number. The client may prefer to edit in weeks.
-- Removing an activity leaves its successors without that predecessor (they keep their dates).
-  Bridging them to the removed activity's predecessors was considered but changes the meaning of
-  the network silently, so the validator's "no predecessors" warning is shown instead.
-- Not done: Playwright end-to-end tests (still no Playwright setup); the editor and print view
-  are covered by component tests in jsdom.
-
-Next: client test sessions with real titles, then Stage B (§7) with the backlog from the
-sessions.
+Client test sessions: [klienttest.md](klienttest.md).

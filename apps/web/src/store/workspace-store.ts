@@ -54,7 +54,7 @@ export interface NewScenarioBookInput {
 }
 
 /**
- * Scenario mode (PLAN §6, Phase 4): a sandbox copy of one publication. Changes to that
+ * Scenario mode (PLAN §5.1.11): a sandbox copy of one publication. Changes to that
  * publication go to the copy until they are applied to the live plan or discarded. Kept in
  * memory only.
  */

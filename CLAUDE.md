@@ -13,17 +13,12 @@ dependencies.
 ## Status
 
 - Stage A (current): frontend only, local state. Stage B (later): Postgres + API + auth.
-- Phase 0 is done: monorepo, tooling, app shell, master plan encoded as data, read-only Masterplan page.
-- Phase 1 is done: the scheduling engine in `packages/domain` (PLAN §4.2 lists the decisions).
-- Phase 2 is done: workspaces, Tidsmaskine, portfolio list, wizard, plan table, side panel.
-- Phase 3 is done: the interactive Gantt (`apps/web/src/components/gantt`).
-- Phase 4 is done: whole-plan dialogs, scenario mode (sandbox), history with the slip chart,
-  scenario books in the demo.
-- Phase 5 is done: Oversigt (portfolio Gantt), Mine opgaver, funding tab and gate logic, role
-  assignments, stress simulation.
-- Phase 6 is built: master plan editor with versions, print/PDF view, Danish error messages,
-  onboarding, accessibility and performance pass. Pending: client test sessions
-  (`docs/klienttest.md`). After that: Stage B (PLAN §7).
+- Phases 0–6 are done (PLAN §6.1): engine, workspaces and Tidsmaskine, plan table, Gantt, delay
+  dialogs, scenario mode, history, portfolio, funding, master plan editor, print. PLAN §4.2 lists
+  the engine decisions, §5.1 what each screen does.
+- Phase 7 is next (PLAN §6.2): flexible plans, from the client's first feedback. Books own their
+  structure, activities can be added and removed, several master plans, fit to the time available,
+  a visual master plan editor. After that: Stage B (PLAN §7).
 
 ## Layout
 
